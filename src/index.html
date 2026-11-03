@@ -1,0 +1,789 @@
+<title>Rota ANPD</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: barra de abas fixa no topo + coluna única de 960px; cartões só onde há ação. Identidade: azul-cobalto institucional, citações legais em mono. */
+:root{
+  --bg:#F2F4F8; --surface:#FFFFFF; --sunk:#E9EDF4; --ink:#121C2E; --muted:#596379; --line:#D8DEE8;
+  --accent:#2445C2; --accent-ink:#FFFFFF; --accent-soft:#E3E8FA;
+  --good:#1D7F47; --good-soft:#E1F3E8; --warn:#9A6212; --warn-soft:#FBF0DC; --bad:#BC2F25; --bad-soft:#FBE5E2;
+  --h0:#E3E8F2; --h1:#BCC8F2; --h2:#8099E6; --h3:#4A67D3; --h4:#2445C2;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1320; --surface:#151D2C; --sunk:#1B2436; --ink:#E6EBF4; --muted:#9AA5BA; --line:#283349;
+  --accent:#8BA2FF; --accent-ink:#0D1320; --accent-soft:#1E2A4E;
+  --good:#5BC98C; --good-soft:#15301F; --warn:#E5B062; --warn-soft:#33270F; --bad:#F27B70; --bad-soft:#3A1A17;
+  --h0:#1E2738; --h1:#24366B; --h2:#33509E; --h3:#5A78D6; --h4:#8BA2FF; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1320; --surface:#151D2C; --sunk:#1B2436; --ink:#E6EBF4; --muted:#9AA5BA; --line:#283349;
+  --accent:#8BA2FF; --accent-ink:#0D1320; --accent-soft:#1E2A4E;
+  --good:#5BC98C; --good-soft:#15301F; --warn:#E5B062; --warn-soft:#33270F; --bad:#F27B70; --bad-soft:#3A1A17;
+  --h0:#1E2738; --h1:#24366B; --h2:#33509E; --h3:#5A78D6; --h4:#8BA2FF; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+a{color:var(--accent)}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h2{font-size:1.45rem} h3{font-size:1.1rem}
+.wrap{max-width:960px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:12px 4px}
+.brand b{font-family:var(--f-display);font-size:1.15rem;letter-spacing:-.01em}
+.brand b span{color:var(--accent)}
+.sync{font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;padding-block:6px 0;scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs a{flex:none;text-decoration:none;color:var(--muted);font-weight:600;font-size:.95rem;padding:8px 12px;border-bottom:3px solid transparent}
+nav.tabs a[aria-current="page"]{color:var(--ink);border-color:var(--accent)}
+nav.tabs a:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding-block:20px 60px;display:grid;gap:20px}
+.eyebrow{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+.muted{color:var(--muted)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:start}
+.grid2>*{min-width:0}
+button,.btn{font:inherit;font-weight:600;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+select{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.ref{font-family:var(--f-mono);font-size:.75rem;background:var(--sunk);color:var(--ink);padding:2px 7px;border-radius:4px;white-space:nowrap}
+.chip{font-size:.75rem;font-weight:700;padding:2px 9px;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
+/* Hero de hoje */
+.hero{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center}
+.daynum{font-family:var(--f-display);font-size:4.2rem;font-weight:700;line-height:.9;color:var(--accent);font-variant-numeric:tabular-nums}
+.hero p{margin:4px 0 0}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stats div{background:var(--surface);padding:12px 14px}
+.stats b{display:block;font-family:var(--f-display);font-size:1.5rem;font-variant-numeric:tabular-nums}
+.stats span{font-size:.8rem;color:var(--muted)}
+@media (max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}.hero{grid-template-columns:1fr}.daynum{font-size:3.2rem}}
+/* Metas */
+.tasks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.tasks li{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:start;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.tasks li.done{background:var(--sunk)}
+.tasks li.done .tl{text-decoration:line-through;color:var(--muted)}
+.tasks input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent)}
+.tasks .tl{font-weight:600}
+.tasks small{display:block;color:var(--muted);font-weight:400}
+.tasks .mins{font-family:var(--f-mono);font-size:.75rem;color:var(--muted);white-space:nowrap}
+.bar{height:8px;background:var(--sunk);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+/* Alertas */
+.alerts{display:grid;gap:8px}
+.alert{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);align-items:start}
+.alert .pill{font-family:var(--f-mono);font-size:.68rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:4px;white-space:nowrap}
+.alert.bad{background:var(--bad-soft)} .alert.bad .pill{background:var(--bad);color:var(--surface)}
+.alert.warn{background:var(--warn-soft)} .alert.warn .pill{background:var(--warn);color:var(--surface)}
+.alert.good{background:var(--good-soft)} .alert.good .pill{background:var(--good);color:var(--surface)}
+.alert b{display:block}
+.alert span{font-size:.92rem;color:var(--ink)}
+/* Questões */
+.q{display:grid;gap:14px}
+.q .stmt{font-size:1.08rem;max-width:68ch}
+.opts{display:grid;gap:8px}
+.opts button{text-align:left;font-weight:400;display:grid;grid-template-columns:28px 1fr;gap:8px}
+.opts button b{font-family:var(--f-mono)}
+.opts button.ok,.ce button.ok{border-color:var(--good);background:var(--good-soft);opacity:1}
+.opts button.no,.ce button.no{border-color:var(--bad);background:var(--bad-soft);opacity:1}
+.ce{display:flex;gap:10px}.ce button{flex:1}
+.feedback{border-left:4px solid var(--good);padding:8px 12px;background:var(--sunk);border-radius:0 8px 8px 0}
+.feedback.no{border-color:var(--bad)}
+.qnav{display:flex;gap:4px;flex-wrap:wrap}
+.qnav span{width:28px;height:28px;display:grid;place-items:center;border-radius:6px;font-family:var(--f-mono);font-size:.75rem;background:var(--sunk);color:var(--muted)}
+.qnav span.cur{outline:2px solid var(--accent)}
+.qnav span.ok{background:var(--good);color:var(--surface)} .qnav span.no{background:var(--bad);color:var(--surface)}
+/* Ciclo */
+.cycle{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.cyc{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.88rem;background:var(--surface)}
+.cyc .n{font-family:var(--f-mono);font-size:.7rem;color:var(--muted)}
+.cyc.done{background:var(--sunk);color:var(--muted)}
+.cyc.next{border:2px solid var(--accent)}
+.phases{display:grid;gap:10px}
+.phase{display:grid;grid-template-columns:120px 1fr;gap:14px;padding:12px 0;border-top:1px solid var(--line)}
+.phase.now .ph{color:var(--accent)}
+.ph{font-family:var(--f-mono);font-size:.78rem}
+@media (max-width:560px){.phase{grid-template-columns:1fr;gap:4px}}
+/* Guias */
+details.topic{border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+details.topic summary{cursor:pointer;padding:12px 14px;font-weight:600;display:flex;gap:10px;align-items:center}
+details.topic summary input{width:18px;height:18px;accent-color:var(--accent)}
+details.topic .body{padding:0 14px 14px 42px}
+details.topic ul{margin:0;padding-left:18px;display:grid;gap:4px;max-width:70ch}
+.trap{margin-top:10px;font-size:.92rem;padding:8px 10px;border-radius:6px;background:var(--warn-soft)}
+.trap b{color:var(--warn)}
+.disc-pick{display:flex;gap:6px;flex-wrap:wrap}
+.disc-pick button{font-size:.88rem;padding:6px 11px}
+.disc-pick button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+/* Timeline */
+.tl-item{display:grid;grid-template-columns:110px 1fr;gap:16px;padding:14px 0;border-top:1px solid var(--line)}
+.tl-item .when{font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
+.tl-item p{margin:6px 0;max-width:68ch}
+@media (max-width:560px){.tl-item{grid-template-columns:1fr;gap:4px}}
+/* Gráficos */
+.chart{overflow-x:auto}
+.chart svg{display:block}
+.chart text{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
+.hbar{display:grid;grid-template-columns:130px 1fr 52px;gap:10px;align-items:center;font-size:.88rem;padding:3px 0}
+.hbar .t{height:12px;background:var(--sunk);border-radius:0 4px 4px 0;position:relative}
+.hbar .t i{position:absolute;inset:0 auto 0 0;background:var(--h3);border-radius:0 4px 4px 0}
+.hbar .t .goal{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);left:70%}
+.hbar .v{font-family:var(--f-mono);font-size:.8rem;text-align:right}
+.legend{display:flex;gap:6px;align-items:center;font-size:.78rem;color:var(--muted);flex-wrap:wrap}
+.legend i{width:12px;height:12px;border-radius:2px;display:inline-block}
+table.plan{border-collapse:collapse;width:100%;font-size:.92rem}
+table.plan th,table.plan td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.plan th{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tbl{overflow-x:auto}
+ol.rules{margin:0;padding-left:20px;display:grid;gap:8px;max-width:72ch}
+.note{font-size:.88rem;color:var(--muted);max-width:72ch}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:20}
+@media (prefers-reduced-motion:no-preference){.bar i,.hbar .t i{transition:width .4s ease}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><b>Rota <span>ANPD</span> · Jullio</b><span class="sync" id="sync">conectando…</span></div>
+    <nav class="tabs" id="tabs">
+      <a href="#hoje">Hoje</a><a href="#simulado">Simulado</a><a href="#relatorio">Relatório</a><a href="#ciclo">Ciclo</a><a href="#guias">Guias</a><a href="#progresso">Progresso</a><a href="#plano">Plano</a><a href="#novidades">Novidades</a><a href="#ajustes">Notificações e download</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="view"></main>
+<div class="toast" id="toast" hidden></div>
+
+<script src="data.js"></script>
+<script>
+// ======== ESTADO ========
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pad = n => String(n).padStart(2,"0");
+const keyOf = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const parseKey = k => { const [y,m,d] = k.split("-").map(Number); return new Date(y,m-1,d); };
+const addDays = (k,n) => { const d = parseKey(k); d.setDate(d.getDate()+n); return keyOf(d); };
+const diffDays = (a,b) => Math.round((parseKey(b)-parseKey(a))/864e5);
+const TODAY = () => keyOf(new Date());
+const fmtDate = k => parseKey(k).toLocaleDateString("pt-BR",{day:"2-digit",month:"short"});
+const WEEKDAY = k => parseKey(k).toLocaleDateString("pt-BR",{weekday:"long"});
+
+function blank(){ return {v:2,start:TODAY(),minutes:120,cyclePos:0,topicPos:{},days:{},log:[],err:{},guide:{},aiQ:[],notif:{on:false,time:"19:00",sent:{}}}; }
+const IN_CLAUDE = !!(window.claude && window.claude.use);
+const SITE_URL = "https://rota-anpd.vercel.app";
+let ready = false;
+let S = blank(), db = null, docRef = null, saveTimer = null, storeMode = "local", sample = null;
+
+function allQ(){ return QB.concat(S.aiQ||[]); }
+function qById(id){ return allQ().find(q=>q.id===id); }
+
+async function boot(){
+  render();
+  let loaded = false;
+  try{
+    if(!IN_CLAUDE) throw new Error("standalone");
+    const [dbx,user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    const uid = user ? await user.id() : null;
+    if(dbx && uid){
+      db = dbx; docRef = db.doc("data/users/"+uid+"/state");
+      const timer = setTimeout(()=>{ if(!loaded) setSync("sem conexão com o servidor; salvando neste navegador"); },10000);
+      const snap = await docRef.get();
+      clearTimeout(timer); loaded = true;
+      if(snap.exists){ S = Object.assign(blank(), snap.data()); S = JSON.parse(JSON.stringify(S)); }
+      else { const l = readLocal(); if(l) S = l; }
+      storeMode = "db"; setSync("progresso salvo na sua conta");
+    } else { const l = readLocal(); if(l) S = l; setSync("salvando neste navegador"); }
+  }catch(e){ const l = readLocal(); if(l) S = l; setSync("salvando neste navegador"); }
+  ready = true; ensureDay(); save(); render();
+  if(!S.notif) S.notif={on:false,time:"19:00",sent:{}};
+  if(IN_CLAUDE){ try{ sample = await window.claude.use("sample"); if(sample && location.hash==="#simulado") render(); }catch(e){} }
+  else { setupPWA(); notifTick(); setInterval(notifTick,60000); }
+}
+function readLocal(){ try{ const t = localStorage.getItem("rota-anpd"); return t ? Object.assign(blank(), JSON.parse(t)) : null; }catch(e){ return null; } }
+function setSync(t){ $("#sync").textContent = t; }
+function save(){
+  if(!ready) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{ localStorage.setItem("rota-anpd", JSON.stringify(S)); }catch(e){}
+    if(storeMode==="db" && docRef){
+      try{ await docRef.set(JSON.parse(JSON.stringify(S))); setSync("salvo às "+new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})); }
+      catch(e){ setSync(e && e.code==="quota_exceeded" ? "armazenamento cheio" : "falha ao salvar; tentaremos de novo"); }
+    }
+  },700);
+}
+function toast(t){ const el=$("#toast"); el.textContent=t; el.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>el.hidden=true,2200); }
+
+// ======== PLANO DO DIA ========
+function blocksFor(m){ return m<=60?1 : m<=120?2 : 3; }
+function blockMin(m){ return m<=60?35 : m<=90?30 : m<=120?40 : 45; }
+function ensureDay(k=TODAY()){
+  if(S.days[k]) return S.days[k];
+  const n = blocksFor(S.minutes), tp = Object.assign({}, S.topicPos), tasks = [];
+  for(let i=0;i<n;i++){
+    const disc = CYCLE[(S.cyclePos+i)%CYCLE.length];
+    const ti = (tp[disc]||0); tp[disc] = ti+1;
+    const tl = GUIDES[disc].topics, top = tl[ti % tl.length];
+    tasks.push({k:"b"+i, type:"block", disc, topic:ti % tl.length, lap: Math.floor(ti/tl.length), label:DISC[disc].s+": "+top.t, min:blockMin(S.minutes), done:false});
+  }
+  tasks.push({k:"sim", type:"sim", label:"Simulado do dia: 10 questões", min:20, done:false});
+  if(S.minutes>=90) tasks.push({k:"rev", type:"rev", label:"Revisão de erros (repetição espaçada)", min:15, done:false});
+  if(S.minutes>=180) tasks.push({k:"lei", type:"lei", label:"Lei seca: leia 15 artigos da LGPD em voz alta", min:15, done:false});
+  S.days[k] = {tasks, simIds: pickSim(k), simAns:{}, simDone:false};
+  save(); return S.days[k];
+}
+function toggleTask(k, key, val){
+  const day = S.days[k]; const t = day.tasks.find(x=>x.k===key); if(!t || t.done===val) return;
+  t.done = val;
+  if(t.type==="block"){
+    if(val){ S.cyclePos++; S.topicPos[t.disc]=(S.topicPos[t.disc]||0)+1; }
+    else { S.cyclePos=Math.max(0,S.cyclePos-1); S.topicPos[t.disc]=Math.max(0,(S.topicPos[t.disc]||0)-1); }
+  }
+  save(); render();
+  if(val && dayPct(k)>=1) toast("Meta do dia cumprida. Boa, Jullio!");
+}
+function dayPct(k){ const d=S.days[k]; if(!d) return 0; const t=d.tasks; return t.filter(x=>x.done).length/t.length; }
+function dayCounts(k){ return dayPct(k) >= 0.6; }
+
+// ======== SIMULADO ========
+function rng(seed){ let h=2166136261; for(const c of seed) h=Math.imul(h^c.charCodeAt(0),16777619); return ()=>{ h^=h<<13; h^=h>>>17; h^=h<<5; return ((h>>>0)%1e6)/1e6; }; }
+function discStats(sinceKey){
+  const st = {}; Object.keys(DISC).forEach(d=>st[d]={n:0,ok:0});
+  for(const e of S.log){ const [k,id,ok] = e.split("|"); if(sinceKey && k<sinceKey) continue; const q=qById(id); if(!q) continue; st[q.d].n++; if(ok==="1") st[q.d].ok++; }
+  return st;
+}
+function pickSim(k){
+  const r = rng("sim"+k), seen = new Set(S.log.map(e=>e.split("|")[1]));
+  const pool = allQ();
+  const fresh = q => !seen.has(q.id);
+  const take = (arr,n,out) => { arr = arr.filter(q=>!out.includes(q.id)).sort(()=>r()-.5); arr.sort((a,b)=>(fresh(b)?1:0)-(fresh(a)?1:0)); for(const q of arr.slice(0,n)) out.push(q.id); };
+  const out = [];
+  take(pool.filter(q=>q.d==="lgpd"||q.d==="anpd"),4,out);
+  const st = discStats(); const weak = Object.keys(st).filter(d=>st[d].n>=4).sort((a,b)=>st[a].ok/st[a].n - st[b].ok/st[b].n).slice(0,2);
+  weak.forEach(d=>take(pool.filter(q=>q.d===d),1,out));
+  const cyc = [0,1,2].map(i=>CYCLE[(S.cyclePos+i)%CYCLE.length]);
+  cyc.forEach(d=>take(pool.filter(q=>q.d===d),1,out));
+  take(pool,10-out.length,out);
+  return out.slice(0,10);
+}
+function answer(ctx, id, choice){
+  const q = qById(id); const ok = q.t==="ce" ? (choice===q.a) : (choice===q.a);
+  const k = TODAY();
+  S.log.push(k+"|"+id+"|"+(ok?1:0)+"|"+(q.t==="ce"?(choice?"C":"E"):choice));
+  if(S.log.length>6000) S.log = S.log.slice(-6000);
+  // repetição espaçada
+  const steps=[1,3,7,21];
+  if(!ok){ S.err[id] = {due:addDays(k,1), step:0}; }
+  else if(S.err[id] && ctx==="rev"){ const s=S.err[id].step+1; if(s>=steps.length) delete S.err[id]; else S.err[id]={due:addDays(k,steps[s]),step:s}; }
+  if(ctx==="sim"){ const d=S.days[k]; d.simAns[id]=choice; if(d.simIds.every(x=>x in d.simAns)){ d.simDone=true; const t=d.tasks.find(x=>x.k==="sim"); if(t) t.done=true; } }
+  if(ctx==="rev"){ const due = Object.keys(S.err).filter(i=>S.err[i].due<=k); if(!due.length){ const t=S.days[k].tasks.find(x=>x.k==="rev"); if(t) t.done=true; } }
+  save(); return ok;
+}
+
+// ======== ALERTAS DE DESEMPENHO ========
+function streaks(){
+  const keys = Object.keys(S.days).sort(); let best=0, run=0, prev=null;
+  for(const k of keys){ if(dayCounts(k)){ run = (prev && diffDays(prev,k)===1) ? run+1 : 1; prev=k; best=Math.max(best,run);} }
+  let cur=0, k=TODAY(); if(!dayCounts(k)) k=addDays(k,-1);
+  while(dayCounts(k)){ cur++; k=addDays(k,-1); }
+  return {cur,best,total:keys.filter(dayCounts).length};
+}
+function acc(from,to){ let n=0,ok=0; for(const e of S.log){ const [k,,o]=e.split("|"); if(k>=from && k<=to){ n++; if(o==="1") ok++; } } return {n,ok,p:n?ok/n:null}; }
+function alerts(){
+  const out=[], t=TODAY();
+  const w1 = acc(addDays(t,-6),t), w0 = acc(addDays(t,-13),addDays(t,-7));
+  if(w1.n>=10){
+    const p=Math.round(w1.p*100);
+    if(p<60) out.push(["bad","Crítico","Acerto de "+p+"% nos últimos 7 dias","Abaixo de 60%. No estilo Cebraspe, cada erro anula um acerto. Reduza a teoria nova e dobre a revisão de erros nesta semana."]);
+    else if(p<70) out.push(["warn","Atenção","Acerto de "+p+"% nos últimos 7 dias","A meta é 70% ou mais. Refaça os erros antes de avançar no ciclo."]);
+    else out.push(["good","No alvo","Acerto de "+p+"% nos últimos 7 dias","Ritmo de aprovação. Mantenha as revisões."]);
+    if(w0.n>=10 && (w1.p-w0.p)<=-0.05) out.push(["warn","Queda","Desempenho caiu "+Math.round((w0.p-w1.p)*100)+" pontos em relação à semana anterior","Verifique cansaço e volume. Uma semana mais leve com revisão costuma recuperar o rendimento."]);
+  }
+  const st = discStats(addDays(t,-29));
+  Object.keys(st).forEach(d=>{ const s=st[d]; if(s.n>=5 && s.ok/s.n<0.55) out.push(["bad","Ponto fraco",DISC[d].s+": "+Math.round(s.ok/s.n*100)+"% de acerto em 30 dias","Releia o guia de "+DISC[d].s+" e faça um treino só dessa disciplina na aba Simulado."]); });
+  const y = addDays(t,-1);
+  if(diffDays(S.start,t)>=1 && !dayCounts(y)) out.push(["warn","Ontem","A meta de ontem não foi cumprida","Sem culpa: o ciclo continua de onde parou. Hoje, faça pelo menos o simulado e um bloco."]);
+  const due = Object.keys(S.err).filter(i=>S.err[i].due<=t).length;
+  if(due>=15) out.push(["warn","Revisão","Há "+due+" questões erradas aguardando revisão","Revisão acumulada vira esquecimento. Use 15 minutos hoje só para elas."]);
+  const lastSeen = {}; Object.keys(S.days).forEach(k=>S.days[k].tasks.forEach(x=>{ if(x.type==="block"&&x.done) lastSeen[x.disc]=k>(lastSeen[x.disc]||"")?k:lastSeen[x.disc]; }));
+  if(diffDays(S.start,t)>=14) Object.keys(DISC).forEach(d=>{ if(!lastSeen[d] || diffDays(lastSeen[d],t)>12) out.push(["warn","Sem contato",DISC[d].s+" não é estudada há mais de 12 dias","Ela entra no próximo bloco do ciclo. Não pule."]); });
+  const s = streaks();
+  if(s.cur>=7) out.push(["good","Sequência",s.cur+" dias seguidos de meta cumprida","Consistência é o que aprova. Continue."]);
+  if(!out.length) out.push(["good","Início","Sem dados suficientes ainda","Os alertas aparecem depois de 10 questões respondidas na semana. Faça o simulado de hoje."]);
+  return out.slice(0,6);
+}
+
+// ======== VIEWS ========
+const VIEWS = {hoje:vHoje, simulado:vSimulado, relatorio:vRelatorio, ciclo:vCiclo, guias:vGuias, progresso:vProgresso, plano:vPlano, novidades:vNovidades, ajustes:vAjustes};
+let ui = {mode:null, list:[], i:0, ansMap:{}, res:{}, guideDisc:"lgpd", trainDisc:"lgpd", ai:{busy:false,msg:""}};
+function route(){ const h=(location.hash||"#hoje").slice(1); return VIEWS[h]?h:"hoje"; }
+function render(){
+  const r=route(); document.querySelectorAll("#tabs a").forEach(a=>a.setAttribute("aria-current", a.getAttribute("href")==="#"+r?"page":"false"));
+  $("#view").innerHTML = VIEWS[r]();
+  bind(r);
+}
+window.addEventListener("hashchange",()=>{ ui.mode=null; render(); window.scrollTo(0,0); });
+
+function phaseInfo(){
+  const w = Math.floor(diffDays(S.start,TODAY())/7)+1;
+  const ph = PHASES.findIndex(p=>w>=p.from && w<=p.to); return {w, idx: ph<0?PHASES.length-1:ph};
+}
+const PHASES = [
+ {from:1,to:6,n:"Fase 1 · Fundamentos",g:"Ler toda a LGPD com o guia, base de Administrativo, Constitucional e Regulação. Meta: 70 questões por semana e acerto acima de 60%."},
+ {from:7,to:12,n:"Fase 2 · Aprofundamento",g:"Resoluções da ANPD, ECA Digital, Marco Civil e TI. Uma redação por semana. Meta: 100 questões por semana e acerto acima de 70%."},
+ {from:13,to:20,n:"Fase 3 · Edital e verticalização",g:"Com o edital publicado, ajuste os guias ao conteúdo oficial e ao estilo da banca. Simulado longo aos domingos (40 a 60 questões)."},
+ {from:21,to:999,n:"Fase 4 · Reta final",g:"Últimas 4 a 6 semanas: só revisão, lei seca e simulados completos cronometrados. Nada de conteúdo novo na última semana."}
+];
+
+function vHoje(){
+  const k=TODAY(), d=S.days[k]||{tasks:[]}, st=streaks(), a=acc("0000",k), pct=Math.round(dayPct(k)*100);
+  const dayN = diffDays(S.start,k)+1, ph=phaseInfo(), due=Object.keys(S.err).filter(i=>S.err[i].due<=k).length;
+  const totalMin = d.tasks.reduce((s,t)=>s+t.min,0);
+  return `
+  <section class="hero">
+    <div class="daynum">${dayN}</div>
+    <div><div class="eyebrow">Dia de preparação · ${esc(WEEKDAY(k))}, ${esc(fmtDate(k))}</div>
+      <h1 style="font-size:1.6rem;margin-top:4px">Bom estudo, Jullio.</h1>
+      <p class="muted">${esc(PHASES[ph.idx].n)} · semana ${ph.w} · ciclo nº ${Math.floor(S.cyclePos/CYCLE.length)+1}</p></div>
+  </section>
+  <div class="stats">
+    <div><b>${st.cur}</b><span>dias seguidos</span></div>
+    <div><b>${st.total}</b><span>dias com meta cumprida</span></div>
+    <div><b>${a.n}</b><span>questões respondidas</span></div>
+    <div><b>${a.p==null?"–":Math.round(a.p*100)+"%"}</b><span>acerto geral</span></div>
+  </div>
+  <div class="grid2">
+    <section class="card" style="display:grid;gap:12px">
+      <div class="row" style="justify-content:space-between"><h2>Meta de hoje</h2><span class="ref">${totalMin} min</span></div>
+      <div class="bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+      <ul class="tasks">${d.tasks.map(t=>`
+        <li class="${t.done?"done":""}"><input type="checkbox" id="t-${t.k}" data-task="${t.k}" ${t.done?"checked":""} aria-label="${esc(t.label)}">
+        <label for="t-${t.k}"><span class="tl">${esc(t.label)}</span>${t.type==="block"?`<small>${t.lap?"Revisão (volta "+(t.lap+1)+") · ":""}Leia o guia, faça resumo de 5 linhas e 5 questões do tema</small>`:t.type==="sim"?`<small>${Object.keys(d.simAns||{}).length}/10 respondidas · <a href="#simulado">abrir</a></small>`:t.type==="rev"?`<small>${due} pendentes hoje · <a href="#simulado">revisar</a></small>`:""}</label>
+        <span class="mins">${t.min}′</span></li>`).join("")}</ul>
+      <p class="note">O dia conta como progresso com 60% da meta. Dia ruim? Faça a versão mínima: o simulado e um bloco.</p>
+    </section>
+    <section class="card" style="display:grid;gap:12px">
+      <h2>Alerta de desempenho</h2>
+      <div class="alerts">${alerts().map(x=>`<div class="alert ${x[0]}"><span class="pill">${esc(x[1])}</span><div><b>${esc(x[2])}</b><span>${esc(x[3])}</span></div></div>`).join("")}</div>
+    </section>
+  </div>
+  <section class="card row" style="justify-content:space-between">
+    <div><div class="eyebrow">Tempo diário disponível</div><div class="muted" style="font-size:.92rem">Muda os blocos a partir de amanhã. O de hoje fica como está.</div></div>
+    <select id="minutes" aria-label="Minutos por dia">${[60,90,120,180,240].map(m=>`<option value="${m}" ${S.minutes===m?"selected":""}>${m>=60?Math.floor(m/60)+"h"+(m%60?m%60:""):m+" min"} por dia</option>`).join("")}</select>
+  </section>`;
+}
+
+function vSimulado(){
+  const k=TODAY(), d=S.days[k], due=Object.keys(S.err).filter(i=>S.err[i].due<=k);
+  if(ui.mode) return vQuiz();
+  const answered = Object.keys(d.simAns).length, hits = d.simIds.filter(id=>id in d.simAns && d.simAns[id]===qById(id).a).length;
+  return `
+  <section style="display:grid;gap:6px"><div class="eyebrow">Simulado diário · ${esc(fmtDate(k))}</div><h1 style="font-size:1.8rem">Desafio de hoje</h1>
+  <p class="muted" style="margin:0;max-width:68ch">10 questões novas por dia: 4 de LGPD e ANPD, as disciplinas mais fracas e as do ciclo. Questões que você erra voltam em 1, 3, 7 e 21 dias.</p></section>
+  <div class="grid2">
+    <section class="card" style="display:grid;gap:10px">
+      <h2>Simulado do dia</h2>
+      <p class="muted" style="margin:0">${d.simDone?`Concluído: ${hits}/10 (${hits*10}%).`:answered?`${answered}/10 respondidas.`:"10 questões, cerca de 20 minutos."}</p>
+      <button class="primary" data-start="sim">${d.simDone?"Rever respostas":answered?"Continuar":"Começar"}</button>
+    </section>
+    <section class="card" style="display:grid;gap:10px">
+      <h2>Revisão de erros</h2>
+      <p class="muted" style="margin:0">${due.length?due.length+" questões para revisar hoje.":"Nada pendente hoje."} ${Object.keys(S.err).length} no caderno de erros.</p>
+      <button data-start="rev" ${due.length?"":"disabled"}>Revisar agora</button>
+    </section>
+  </div>
+  <section class="card" style="display:grid;gap:12px">
+    <h2>Treino por disciplina</h2>
+    <div class="disc-pick">${Object.keys(DISC).map(x=>`<button data-tdisc="${x}" aria-pressed="${ui.trainDisc===x}">${esc(DISC[x].s)} <span class="muted">${allQ().filter(q=>q.d===x).length}</span></button>`).join("")}</div>
+    <div class="row"><button class="primary" data-start="train">Treinar ${esc(DISC[ui.trainDisc].s)}</button>
+    ${sample?`<button id="ai-gen" ${ui.ai.busy?"disabled":""}>${ui.ai.busy?"Gerando…":"Gerar 5 questões inéditas com IA"}</button>`:""}</div>
+    ${ui.ai.msg?`<p class="note">${esc(ui.ai.msg)}</p>`:""}
+    <p class="note">Banco atual: ${QB.length} questões no padrão Cebraspe, FGV e IADES (a IADES aplicou a seleção da ANPD em 2025), sobre os temas mais cobrados. ${(S.aiQ||[]).length?(S.aiQ.length+" questões geradas por IA no seu banco."):""} Questões de IA podem conter erro: confira sempre a referência.</p>
+  </section>`;
+}
+function vQuiz(){
+  const id = ui.list[ui.i], q = qById(id), k=TODAY();
+  const prev = ui.mode==="sim" ? S.days[k].simAns[id] : ui.ansMap[id];
+  const answered = prev!==undefined && prev!==null;
+  const ok = answered && prev===q.a;
+  const nav = ui.list.map((x,j)=>{ let c=""; if(ui.mode==="sim" && x in S.days[k].simAns) c = S.days[k].simAns[x]===qById(x).a?"ok":"no"; else if(ui.res && x in ui.res) c = ui.res[x]?"ok":"no"; return `<span class="${c} ${j===ui.i?"cur":""}">${j+1}</span>`; }).join("");
+  const L="ABCDE";
+  return `<section class="card q">
+    <div class="row" style="justify-content:space-between"><div class="row"><span class="chip">${esc(DISC[q.d].s)}</span><span class="eyebrow">Estilo ${esc(q.e||"IA")}</span></div><button data-quit>Sair</button></div>
+    <div class="qnav">${nav}</div>
+    <div class="stmt">${esc(q.q)}</div>
+    ${q.t==="ce" ? `<div class="ce">${[true,false].map(v=>`<button data-ans="${v}" class="${answered&&v===q.a?"ok":answered&&v===prev?"no":""}" ${answered?"disabled":""}>${v?"Certo":"Errado"}</button>`).join("")}</div>`
+      : `<div class="opts">${q.o.map((o,j)=>`<button data-ans="${j}" class="${answered&&j===q.a?"ok":answered&&j===prev?"no":""}" ${answered?"disabled":""}><b>${L[j]}</b><span>${esc(o)}</span></button>`).join("")}</div>`}
+    ${answered?`<div class="feedback ${ok?"":"no"}"><b>${ok?"Acertou.":"Errou."}</b> ${q.t==="ce"?"Gabarito: "+(q.a?"Certo":"Errado")+". ":"Gabarito: "+L[q.a]+". "}${esc(q.c)} <span class="ref">${esc(q.r)}</span></div>`:""}
+    <div class="row" style="justify-content:space-between"><button data-step="-1" ${ui.i?"":"disabled"}>Anterior</button>
+    ${ui.i<ui.list.length-1?`<button class="primary" data-step="1" ${answered||ui.mode==="sim"?"":"disabled"}>Próxima</button>`:`<button class="primary" data-quit>Concluir</button>`}</div>
+  </section>`;
+}
+
+function vCiclo(){
+  const pos=S.cyclePos%CYCLE.length, lap=Math.floor(S.cyclePos/CYCLE.length)+1, ph=phaseInfo();
+  return `
+  <section style="display:grid;gap:6px"><div class="eyebrow">Ciclo de estudos · volta ${lap}</div><h1 style="font-size:1.8rem">Ciclo de desenvolvimento</h1>
+  <p class="muted" style="margin:0;max-width:68ch">O ciclo substitui o cronograma fixo: você estuda a próxima sessão da fila, não a matéria do dia da semana. Se faltar um dia, nada se perde. Disciplinas com mais peso aparecem mais vezes.</p></section>
+  <section class="card" style="display:grid;gap:12px">
+    <div class="row" style="justify-content:space-between"><h2>Volta ${lap}: ${pos}/${CYCLE.length} sessões</h2><span class="ref">${Math.round(pos/CYCLE.length*100)}%</span></div>
+    <div class="bar"><i style="width:${pos/CYCLE.length*100}%"></i></div>
+    <div class="cycle">${CYCLE.map((d,i)=>`<div class="cyc ${i<pos?"done":i===pos?"next":""}"><div class="n">${pad(i+1)}${i===pos?" · próxima":""}</div>${esc(DISC[d].s)}</div>`).join("")}</div>
+  </section>
+  <section class="card"><h2>Fases da preparação</h2><p class="muted">Você está na semana ${ph.w}, contada a partir de ${esc(fmtDate(S.start))}.</p>
+    <div class="phases">${PHASES.map((p,i)=>`<div class="phase ${i===ph.idx?"now":""}"><div class="ph">${i===ph.idx?"AGORA · ":""}Sem. ${p.from}${p.to<999?"–"+p.to:"+"}</div><div><b>${esc(p.n)}</b><div class="muted">${esc(p.g)}</div></div></div>`).join("")}</div>
+  </section>
+  <section class="card"><h2>Pesos do ciclo</h2>
+    ${Object.keys(DISC).map(d=>{ const n=CYCLE.filter(x=>x===d).length, tp=S.topicPos[d]||0, tl=GUIDES[d].topics.length; return `<div class="hbar"><span>${esc(DISC[d].s)}</span><span class="t" title="${tp} de ${tl} tópicos"><i style="width:${Math.min(100,tp/tl*100)}%"></i></span><span class="v">${n}× · ${Math.min(tp,tl)}/${tl}</span></div>`;}).join("")}
+    <p class="note">Barra: tópicos do guia já estudados. Número à direita: quantas vezes a disciplina aparece em cada volta do ciclo.</p>
+  </section>`;
+}
+
+function vGuias(){
+  const d=ui.guideDisc, g=GUIDES[d]; const done = g.topics.filter((_,i)=>S.guide[d+"-"+i]).length;
+  return `
+  <section style="display:grid;gap:6px"><div class="eyebrow">Guias de estudo</div><h1 style="font-size:1.8rem">${esc(DISC[d].n)}</h1></section>
+  <div class="disc-pick">${Object.keys(DISC).map(x=>`<button data-gdisc="${x}" aria-pressed="${x===d}">${esc(DISC[x].s)}</button>`).join("")}</div>
+  <section class="card" style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><b>O que cai</b><span class="ref">${done}/${g.topics.length} dominados</span></div><p style="margin:0;max-width:70ch">${esc(g.cai)}</p></section>
+  <div style="display:grid;gap:8px">${g.topics.map((t,i)=>`<details class="topic"><summary><input type="checkbox" data-guide="${d}-${i}" ${S.guide[d+"-"+i]?"checked":""} aria-label="Marcar como dominado" onclick="event.stopPropagation()">${esc(t.t)}</summary>
+    <div class="body"><ul>${t.b.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><div class="trap"><b>Pegadinha:</b> ${esc(t.p)}</div></div></details>`).join("")}</div>
+  <p class="note">Marque um tópico como dominado quando acertar pelo menos 4 de 5 questões sobre ele.</p>`;
+}
+
+function vProgresso(){
+  const t=TODAY(), st=streaks(), ds=discStats();
+  // heatmap 16 semanas
+  const weeks=16, start=addDays(t,-weeks*7-parseKey(t).getDay());
+  let cells="", cs=13, gap=3;
+  for(let w=0;w<weeks+1;w++) for(let dw=0;dw<7;dw++){
+    const k=addDays(start,w*7+dw); if(k>t) continue;
+    const p=dayPct(k), lvl = !S.days[k]?0 : p===0?0 : p<0.6?1 : p<0.8?2 : p<1?3 : 4;
+    cells+=`<rect x="${30+w*(cs+gap)}" y="${dw*(cs+gap)}" width="${cs}" height="${cs}" rx="2" fill="var(--h${lvl})"><title>${fmtDate(k)}: ${S.days[k]?Math.round(p*100)+"% da meta":"sem registro"}</title></rect>`;
+  }
+  const hw = 30+(weeks+1)*(cs+gap);
+  const dl=["D","S","T","Q","Q","S","S"].map((x,i)=>i%2?`<text x="0" y="${i*(cs+gap)+10}">${x}</text>`:"").join("");
+  // acerto semanal (8 semanas)
+  const pts=[]; for(let i=7;i>=0;i--){ const to=addDays(t,-i*7), a=acc(addDays(to,-6),to); pts.push({k:to,p:a.p,n:a.n}); }
+  const W=560,H=170,px=36,py=14, x=i=>px+i*(W-px-12)/7, y=v=>py+(1-v)*(H-py-24);
+  const valid=pts.map((p,i)=>({...p,i})).filter(p=>p.p!=null);
+  const line = valid.map((p,j)=>(j?"L":"M")+x(p.i)+" "+y(p.p)).join(" ");
+  const area = valid.length>1 ? line+` L${x(valid[valid.length-1].i)} ${y(0)} L${x(valid[0].i)} ${y(0)} Z` : "";
+  const grid=[0,.5,.7,1].map(v=>`<line x1="${px}" x2="${W-12}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" ${v===.7?'stroke-dasharray="4 3" stroke="var(--muted)"':""}/><text x="0" y="${y(v)+3}">${v*100}%</text>`).join("");
+  const xl=pts.map((p,i)=>`<text x="${x(i)-14}" y="${H-4}">${fmtDate(p.k).replace(" de ","/").replace(".","")}</text>`).join("");
+  const dots=valid.map((p,j)=>`<circle cx="${x(p.i)}" cy="${y(p.p)}" r="${j===valid.length-1?5:4}" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"><title>Semana até ${fmtDate(p.k)}: ${Math.round(p.p*100)}% em ${p.n} questões</title></circle>`).join("");
+  return `
+  <section style="display:grid;gap:6px"><div class="eyebrow">Progresso de Jullio</div><h1 style="font-size:1.8rem">Dias de progresso</h1></section>
+  <div class="stats">
+    <div><b>${st.cur}</b><span>sequência atual</span></div><div><b>${st.best}</b><span>melhor sequência</span></div>
+    <div><b>${st.total}</b><span>dias com meta</span></div><div><b>${diffDays(S.start,t)+1}</b><span>dias desde o início</span></div>
+  </div>
+  <section class="card" style="display:grid;gap:10px"><h2>Calendário de metas · 16 semanas</h2>
+    <div class="chart"><svg width="${hw}" height="${7*(cs+gap)}" role="img" aria-label="Calendário de cumprimento da meta diária">${dl}${cells}</svg></div>
+    <div class="legend">Menos <i style="background:var(--h0)"></i><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i> Meta completa</div>
+  </section>
+  <section class="card" style="display:grid;gap:10px"><h2>Acerto semanal</h2><p class="note" style="margin:0">Linha tracejada: meta de 70%.</p>
+    ${valid.length?`<div class="chart"><svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:420px" role="img" aria-label="Percentual de acerto por semana">${grid}${area?`<path d="${area}" fill="var(--accent)" opacity=".12"/>`:""}<path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>${dots}${xl}</svg></div>`:`<p class="muted">O gráfico aparece depois do primeiro simulado.</p>`}
+  </section>
+  <section class="card" style="display:grid;gap:6px"><h2>Acerto por disciplina</h2><p class="note" style="margin:0 0 6px">Marca vertical: meta de 70%.</p>
+    ${Object.keys(DISC).map(d=>{const s=ds[d], p=s.n?s.ok/s.n:0; return `<div class="hbar"><span>${esc(DISC[d].s)}</span><span class="t"><i style="width:${p*100}%;background:${!s.n?"var(--h0)":p<.55?"var(--bad)":p<.7?"var(--warn)":"var(--h3)"}"></i><span class="goal"></span></span><span class="v">${s.n?Math.round(p*100)+"%":"–"}</span></div>`;}).join("")}
+    <p class="note">Barras vermelhas (abaixo de 55%) e amarelas (55% a 69%) geram alertas na aba Hoje.</p>
+  </section>
+  <section class="card row" style="justify-content:space-between"><div><b>Recomeçar do zero</b><div class="muted" style="font-size:.92rem">Apaga todo o progresso e reinicia no dia de hoje.</div></div>
+    <div class="row">${ui.confirmReset?`<button data-reset="yes" style="border-color:var(--bad);color:var(--bad)">Confirmar: apagar tudo</button><button data-reset="no">Cancelar</button>`:`<button data-reset="ask">Recomeçar</button>`}</div></section>`;
+}
+
+function vPlano(){
+  const m=S.minutes, n=blocksFor(m), bm=blockMin(m);
+  return `
+  <section style="display:grid;gap:6px"><div class="eyebrow">Planejamento · concurso ANPD</div><h1 style="font-size:1.8rem">Plano para manter todos os dias</h1>
+  <p class="muted" style="margin:0;max-width:68ch">Plano pré-edital. O edital ainda não saiu e a banca não foi definida (novembro de 2026). Estudamos o que é certo de cair (LGPD e ANPD) e a base comum das agências reguladoras. Quando o edital sair, os guias serão ajustados.</p></section>
+  <section class="card" style="display:grid;gap:12px"><h2>Rotina diária (${m} min)</h2>
+    <div class="tbl"><table class="plan"><thead><tr><th>Etapa</th><th>Tempo</th><th>O que fazer</th></tr></thead><tbody>
+      ${Array.from({length:n},(_,i)=>`<tr><td>Bloco ${i+1} do ciclo</td><td>${bm} min</td><td>Ler o tópico no guia, resumir em 5 linhas com as palavras-chave e marcar artigos na lei seca.</td></tr>`).join("")}
+      <tr><td>Simulado do dia</td><td>20 min</td><td>10 questões, sem consulta. Ler todos os comentários, inclusive dos acertos.</td></tr>
+      ${m>=90?`<tr><td>Revisão de erros</td><td>15 min</td><td>Refazer as questões do caderno de erros que vencem hoje (1, 3, 7 e 21 dias).</td></tr>`:""}
+      ${m>=180?`<tr><td>Lei seca</td><td>15 min</td><td>15 artigos da LGPD por dia. Em 6 dias você percorre a lei inteira.</td></tr>`:""}
+    </tbody></table></div>
+    <p class="note">Mude o tempo diário na aba Hoje. Em dias difíceis vale a versão mínima de 30 minutos: simulado + 10 minutos de lei seca. Ela mantém a sequência viva.</p>
+  </section>
+  <section class="card" style="display:grid;gap:12px"><h2>Semana-modelo</h2>
+    <div class="tbl"><table class="plan"><thead><tr><th>Dia</th><th>Foco</th></tr></thead><tbody>
+      <tr><td>Segunda a sexta</td><td>Rotina diária completa, seguindo o ciclo.</td></tr>
+      <tr><td>Sábado</td><td>Rotina + 1 bloco extra do ciclo. Na Fase 2 em diante: uma redação (30 linhas) sobre tema de proteção de dados.</td></tr>
+      <tr><td>Domingo</td><td>Check-in semanal (20 min): olhe a aba Progresso e os alertas. Refaça todos os erros da semana. Leve: sem teoria nova.</td></tr>
+    </tbody></table></div>
+  </section>
+  <section class="card" style="display:grid;gap:12px"><h2>Regras para não desistir</h2>
+    <ol class="rules">
+      <li><b>Nunca zere o dia.</b> A versão mínima de 30 minutos conta mais do que um sábado de 8 horas seguido de uma semana parada.</li>
+      <li><b>Siga o ciclo, não o calendário.</b> Faltou? Continue de onde parou. Nenhuma matéria fica para trás.</li>
+      <li><b>Questões todos os dias.</b> O simulado é o termômetro. Abaixo de 70% de acerto, a prioridade é revisão, não conteúdo novo.</li>
+      <li><b>Erro é material de estudo.</b> Toda questão errada volta em 1, 3, 7 e 21 dias até você acertar quatro vezes.</li>
+      <li><b>Lei seca é obrigatória.</b> LGPD, Lei 13.848 e resoluções da ANPD são cobradas pela letra da lei.</li>
+      <li><b>Domingo é dia de ajuste.</b> Leia os alertas e ajuste o tempo diário se a meta estiver pesada demais.</li>
+    </ol>
+  </section>
+  <section class="card" style="display:grid;gap:12px"><h2>Disciplinas prováveis</h2>
+    <p class="note" style="margin:0">Baseado nos editais de outras agências reguladoras e nas competências da ANPD. Não é conteúdo oficial.</p>
+    <div class="tbl"><table class="plan"><thead><tr><th>Bloco</th><th>Disciplina</th><th>Peso no ciclo</th></tr></thead><tbody>
+      ${Object.keys(DISC).map(d=>`<tr><td>${["lgpd","anpd","reg","digital","ti"].includes(d)?"Específicos":"Gerais"}</td><td>${esc(DISC[d].n)}</td><td>${CYCLE.filter(x=>x===d).length} de ${CYCLE.length}</td></tr>`).join("")}
+    </tbody></table></div>
+  </section>
+  <section class="card" style="display:grid;gap:12px"><h2>Discursiva: uma redação por semana (a partir da Fase 2)</h2>
+    <p class="note" style="margin:0">Agências reguladoras costumam cobrar texto dissertativo de 20 a 30 linhas. Estrutura: introdução com a tese (3–4 linhas), dois parágrafos de desenvolvimento citando a norma (art., resolução), conclusão com proposta. Escreva à mão, cronometre 40 minutos.</p>
+    <ol class="rules">${ESSAYS.map(t=>`<li>${esc(t)}</li>`).join("")}</ol>
+  </section>`;
+}
+
+function vNovidades(){
+  return `
+  <section style="display:grid;gap:6px"><div class="eyebrow">Atualizado em 3 de novembro de 2026</div><h1 style="font-size:1.8rem">Novidades do concurso e das normas</h1>
+  <p class="muted" style="margin:0;max-width:68ch">Situação do concurso e mudanças legais que entram no estudo. Confirme sempre no site oficial da ANPD e no Diário Oficial.</p></section>
+  <section class="card">${UPDATES.map(u=>`<div class="tl-item"><div class="when">${esc(u.d)}<br><span class="chip">${esc(u.tag)}</span></div><div><h3>${esc(u.t)}</h3><p>${esc(u.b)}</p><div class="row" style="gap:10px;font-size:.88rem">${u.src.map(s=>`<a href="${esc(s[1])}" target="_blank" rel="noopener">${esc(s[0])}</a>`).join("")}</div></div></div>`).join("")}</section>
+  <p class="note">Acompanhe: <a href="https://www.gov.br/anpd/pt-br" target="_blank" rel="noopener">gov.br/anpd</a>. Quando o edital sair, peça ao Claude para atualizar este app com o conteúdo oficial e a banca escolhida.</p>`;
+}
+
+// ======== RELATÓRIO DE EVOLUÇÃO ========
+function themeKey(r){ const m=String(r).match(/^([^,;]+(?:,\s*art\.\s*\d+[º°-]?[A-Z]?)?)/); return m?m[1].trim():r; }
+function reportData(){
+  const t=TODAY(), since=addDays(t,-29), per={}, th={};
+  Object.keys(DISC).forEach(d=>per[d]={n:0,ok:0,n30:0,ok30:0});
+  let markC=0, markE=0;
+  for(const e of S.log){ const [k,id,o,c]=e.split("|"); const q=qById(id); if(!q) continue; const P=per[q.d];
+    P.n++; if(o==="1") P.ok++; if(k>=since){ P.n30++; if(o==="1") P.ok30++; }
+    const tk=themeKey(q.r); th[tk]=th[tk]||{n:0,ok:0,d:q.d}; th[tk].n++; if(o==="1") th[tk].ok++;
+    if(q.t==="ce" && o==="0"){ if(c==="C") markC++; else if(c==="E") markE++; } }
+  const rows=Object.keys(DISC).map(d=>{ const P=per[d], a=P.n30>=3?P.ok30/P.n30:(P.n?P.ok/P.n:null), w=CYCLE.filter(x=>x===d).length;
+    const gd=GUIDES[d].topics.filter((_,i)=>S.guide[d+"-"+i]).length, gt=GUIDES[d].topics.length;
+    const gap=a==null?0.45:Math.max(0,0.8-a), conf=a==null?0.6:Math.min(1,(P.n30||P.n)/8)*0.7+0.3;
+    return {d,n:P.n,a,w,gd,gt,score:w*gap*conf+(1-gd/gt)*0.06*w}; }).sort((x,y)=>y.score-x.score);
+  const max=Math.max(...rows.map(r=>r.score),0.0001); rows.forEach(r=>r.rel=r.score/max);
+  const themes=Object.entries(th).filter(([,v])=>v.n>=2 && v.ok/v.n<0.7).map(([k,v])=>({k,...v,p:v.ok/v.n})).sort((a,b)=>a.p-b.p||b.n-a.n).slice(0,8);
+  const days14=[...Array(14)].map((_,i)=>addDays(t,-i)).filter(k=>k>=S.start && dayCounts(k)).length;
+  const span14=Math.min(14,diffDays(S.start,t)+1);
+  return {rows,themes,markC,markE,days14,span14,w1:acc(addDays(t,-6),t),w0:acc(addDays(t,-13),addDays(t,-7)),errN:Object.keys(S.err).length,total:acc("0000",t)};
+}
+function actionFor(r){
+  if(r.a==null) return "Ainda sem medição. Faça um treino de 10 questões de "+DISC[r.d].s+" para o app saber seu nível.";
+  if(r.a<0.55) return "Volte à base: releia o guia inteiro, leia a lei seca do tema e faça 2 treinos de 10 questões nesta semana.";
+  if(r.a<0.7) return "Quase lá: 1 treino de 10 questões a cada 2 dias e refaça todos os erros do caderno.";
+  return "Manutenção: 1 treino por semana e revisão dos erros.";
+}
+function insights(R){
+  const out=[];
+  if(R.total.n<10) out.push("Ainda há poucos dados ("+R.total.n+" questões). O relatório fica preciso a partir de 30 questões respondidas.");
+  if(R.markC+R.markE>=4){
+    if(R.markC>=R.markE*1.5) out.push("Nos itens de certo/errado, você marca Certo em itens errados ("+R.markC+" vezes contra "+R.markE+"). Tende a aceitar generalizações: procure a palavra que torna o item falso (sempre, apenas, obrigatoriamente, deve).");
+    else if(R.markE>=R.markC*1.5) out.push("Nos itens de certo/errado, você marca Errado em itens certos ("+R.markE+" vezes contra "+R.markC+"). Há desconfiança em excesso: itens que reproduzem a letra da lei costumam estar certos.");
+  }
+  if(R.span14>=5 && R.days14/R.span14<0.7) out.push("Consistência: meta cumprida em "+R.days14+" de "+R.span14+" dias. Reduza o tempo diário na aba Hoje para um valor que você cumpra todos os dias.");
+  if(R.w1.n>=10 && R.w0.n>=10){ const dlt=Math.round((R.w1.p-R.w0.p)*100); out.push("Acerto desta semana: "+Math.round(R.w1.p*100)+"% ("+(dlt>=0?"+":"")+dlt+" pontos em relação à semana anterior)."); }
+  if(R.errN>=20) out.push("O caderno de erros tem "+R.errN+" questões. Antes de avançar no ciclo, zere as revisões vencidas.");
+  return out;
+}
+function weakList(){
+  const R=reportData(), seen=new Set(S.log.map(e=>e.split("|")[1])), out=[];
+  const themeKeys=new Set(R.themes.map(t=>t.k));
+  Object.keys(S.err).forEach(id=>{ const q=qById(id); if(q && themeKeys.has(themeKey(q.r)) && out.length<5) out.push(id); });
+  R.rows.slice(0,3).forEach(r=>{ allQ().filter(q=>q.d===r.d && !seen.has(q.id) && !out.includes(q.id)).slice(0,2).forEach(q=>out.length<10&&out.push(q.id)); });
+  allQ().filter(q=>q.d===R.rows[0].d && !out.includes(q.id)).forEach(q=>out.length<10&&out.push(q.id));
+  return out;
+}
+function vRelatorio(){
+  if(ui.mode) return vQuiz();
+  const R=reportData(), top=R.rows.slice(0,3), ins=insights(R);
+  return `
+  <section style="display:grid;gap:6px"><div class="eyebrow">Relatório de evolução · ${esc(fmtDate(TODAY()))}</div><h1 style="font-size:1.8rem">Onde Jullio mais precisa evoluir</h1>
+  <p class="muted" style="margin:0;max-width:68ch">A prioridade combina o peso da disciplina no ciclo, a distância até 80% de acerto nos últimos 30 dias e os tópicos do guia ainda não dominados.</p></section>
+  <div class="grid2">${top.map((r,i)=>`<section class="card" style="display:grid;gap:8px"><div class="row" style="justify-content:space-between"><span class="eyebrow">Prioridade ${i+1}</span><span class="ref">${r.a==null?"sem dados":Math.round(r.a*100)+"% de acerto"}</span></div><h2>${esc(DISC[r.d].s)}</h2><p style="margin:0">${esc(actionFor(r))}</p><p class="note" style="margin:0">${r.n} questões respondidas · ${r.gd}/${r.gt} tópicos dominados</p></section>`).join("")}</div>
+  <section class="card" style="display:grid;gap:10px"><h2>Diagnóstico</h2>
+    ${ins.length?`<ul style="margin:0;padding-left:18px;display:grid;gap:6px;max-width:72ch">${ins.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<p class="muted" style="margin:0">Sem pontos de atenção além das prioridades acima.</p>`}
+  </section>
+  <section class="card" style="display:grid;gap:6px"><h2>Prioridade por disciplina</h2>
+    ${R.rows.map(r=>`<div class="hbar"><span>${esc(DISC[r.d].s)}</span><span class="t" title="Índice de prioridade"><i style="width:${Math.round(r.rel*100)}%"></i></span><span class="v">${r.a==null?"–":Math.round(r.a*100)+"%"}</span></div>`).join("")}
+    <p class="note">Barra maior = estudar primeiro. À direita, acerto nos últimos 30 dias.</p>
+  </section>
+  <section class="card" style="display:grid;gap:10px"><h2>Temas que você mais erra</h2>
+    ${R.themes.length?`<div class="tbl"><table class="plan"><thead><tr><th>Tema</th><th>Disciplina</th><th>Acerto</th></tr></thead><tbody>${R.themes.map(t=>`<tr><td><span class="ref">${esc(t.k)}</span></td><td>${esc(DISC[t.d].s)}</td><td>${t.ok}/${t.n} (${Math.round(t.p*100)}%)</td></tr>`).join("")}</tbody></table></div>`:`<p class="muted" style="margin:0">Aparece quando um mesmo artigo ou norma tiver pelo menos 2 questões respondidas com acerto abaixo de 70%.</p>`}
+  </section>
+  <section class="card" style="display:grid;gap:10px"><h2>Plano dos próximos 7 dias</h2>
+    <ol class="rules">
+      <li>Siga o ciclo normalmente na aba Hoje. Não pule disciplinas.</li>
+      <li>Some 1 treino de pontos fracos (10 questões) em dias alternados: ${esc(top.map(r=>DISC[r.d].s).join(", "))}.</li>
+      ${R.themes.slice(0,3).map(t=>`<li>Releia ${esc(t.k)} na lei seca e refaça as questões desse tema.</li>`).join("")}
+      <li>No domingo, abra este relatório de novo e compare.</li>
+    </ol>
+    <div class="row"><button class="primary" data-start="weak">Treinar pontos fracos agora</button><button data-dl="report">Baixar relatório</button></div>
+  </section>`;
+}
+function reportHTML(){
+  const R=reportData(), ins=insights(R), st=streaks();
+  const css="body{font-family:system-ui,sans-serif;max-width:760px;margin:24px auto;padding:0 16px;color:#121C2E;line-height:1.5}h1{color:#2445C2}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #D8DEE8;padding:6px;text-align:left}small{color:#596379}";
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório Rota ANPD ${TODAY()}</title><style>${css}</style></head><body>
+<h1>Relatório de evolução · Jullio</h1><small>Gerado em ${new Date().toLocaleString("pt-BR")} · início da preparação em ${fmtDate(S.start)}</small>
+<p><b>Sequência atual:</b> ${st.cur} dias · <b>Dias com meta:</b> ${st.total} · <b>Questões:</b> ${R.total.n} · <b>Acerto geral:</b> ${R.total.p==null?"–":Math.round(R.total.p*100)+"%"}</p>
+<h2>Prioridades</h2><ol>${R.rows.slice(0,3).map(r=>`<li><b>${esc(DISC[r.d].n)}</b> (${r.a==null?"sem dados":Math.round(r.a*100)+"%"}): ${esc(actionFor(r))}</li>`).join("")}</ol>
+<h2>Diagnóstico</h2><ul>${ins.map(x=>`<li>${esc(x)}</li>`).join("")||"<li>Sem pontos de atenção.</li>"}</ul>
+<h2>Acerto por disciplina</h2><table><tr><th>Disciplina</th><th>Questões</th><th>Acerto (30 dias)</th><th>Tópicos dominados</th></tr>${R.rows.map(r=>`<tr><td>${esc(DISC[r.d].s)}</td><td>${r.n}</td><td>${r.a==null?"–":Math.round(r.a*100)+"%"}</td><td>${r.gd}/${r.gt}</td></tr>`).join("")}</table>
+<h2>Temas mais errados</h2><table><tr><th>Tema</th><th>Acerto</th></tr>${R.themes.map(t=>`<tr><td>${esc(t.k)}</td><td>${t.ok}/${t.n}</td></tr>`).join("")||"<tr><td colspan=2>Sem dados suficientes.</td></tr>"}</table>
+</body></html>`;
+}
+
+// ======== ARQUIVOS, NOTIFICAÇÕES E INSTALAÇÃO ========
+async function saveFile(name, text, mime){
+  if(IN_CLAUDE){
+    let dl=null; try{ dl=await window.claude.use("downloads"); }catch(e){}
+    if(!dl){ toast("Download indisponível nesta visualização. Use a versão do site."); return; }
+    try{ const r=await dl.save({filename:name, data:new Blob([text],{type:mime})}); if(r && r.status==="saved") toast("Arquivo salvo."); }
+    catch(e){ if(e && e.code!=="denied" && e.code!=="cancelled") toast("Não foi possível salvar o arquivo."); }
+    return;
+  }
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:mime})); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500); toast("Download iniciado.");
+}
+function icsText(){
+  const [h,m]=(S.notif.time||"19:00").split(":"), d=TODAY().replace(/-/g,""), now=new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"Z";
+  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Rota ANPD//PT-BR","CALSCALE:GREGORIAN","BEGIN:VEVENT","UID:rota-anpd-estudo-diario","DTSTAMP:"+now,
+    "DTSTART:"+d+"T"+h+m+"00","DURATION:PT"+S.minutes+"M","RRULE:FREQ=DAILY","SUMMARY:Estudo ANPD: meta do dia",
+    "DESCRIPTION:Abra o Rota ANPD: blocos do ciclo\\, simulado de 10 questões e revisão de erros. "+SITE_URL,
+    "BEGIN:VALARM","TRIGGER:-PT0M","ACTION:DISPLAY","DESCRIPTION:Hora de estudar para a ANPD","END:VALARM",
+    "BEGIN:VALARM","TRIGGER:PT2H","ACTION:DISPLAY","DESCRIPTION:Já fez o simulado de hoje?","END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n");
+}
+let swReg=null, installEvt=null;
+function setupPWA(){
+  if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").then(r=>swReg=r).catch(()=>{});
+  window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); installEvt=e; if(route()==="ajustes") render(); });
+}
+function notifBody(){
+  const k=TODAY(), d=S.days[k], left=d?d.tasks.filter(t=>!t.done).length:0, a=alerts().find(x=>x[0]==="bad");
+  return (left?left+" tarefas da meta de hoje pendentes.":"Meta de hoje cumprida.")+(a?" Alerta: "+a[2]+".":"");
+}
+async function showNotif(title, body){
+  try{ if(swReg && swReg.showNotification) await swReg.showNotification(title,{body,icon:"icon-192.png",badge:"icon-192.png",tag:"rota-anpd"}); else new Notification(title,{body,icon:"icon-192.png"}); return true; }catch(e){ return false; }
+}
+function notifTick(){
+  if(IN_CLAUDE || !S.notif || !S.notif.on || !("Notification" in window) || Notification.permission!=="granted") return;
+  const k=TODAY(), now=new Date(), hm=pad(now.getHours())+":"+pad(now.getMinutes());
+  if(hm>=S.notif.time && !S.notif.sent[k] && dayPct(k)<1){ S.notif.sent={[k]:true}; save(); showNotif("Rota ANPD · hora de estudar", notifBody()); }
+}
+function vAjustes(){
+  const perm = ("Notification" in window) ? Notification.permission : "unsupported";
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  return `
+  <section style="display:grid;gap:6px"><div class="eyebrow">Ajustes</div><h1 style="font-size:1.8rem">Notificações e download</h1></section>
+  <section class="card" style="display:grid;gap:12px"><h2>Lembrete diário</h2>
+    <div class="row"><label for="ntime">Horário do estudo</label><input type="time" id="ntime" value="${esc(S.notif.time)}" style="font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)"></div>
+    ${IN_CLAUDE?`<p class="note" style="margin:0">Notificações do sistema funcionam na versão instalável do site. Aqui, use o lembrete de calendário: ele avisa no celular mesmo com o app fechado.</p>`
+    :`<div class="row"><button class="${S.notif.on&&perm==="granted"?"":"primary"}" id="n-on">${S.notif.on&&perm==="granted"?"Desativar notificações":"Ativar notificações"}</button><button id="n-test" ${perm==="granted"?"":"disabled"}>Testar agora</button></div>
+      <p class="note" style="margin:0">Status: ${perm==="granted"?"permitidas":perm==="denied"?"bloqueadas no navegador (libere nas configurações do site)":perm==="unsupported"?"este navegador não suporta":"ainda não autorizadas"}. O aviso chega no horário escolhido se a meta não estiver completa, com o alerta de desempenho mais importante. Ele depende de o app estar aberto ou instalado. Para garantia total, adicione também o lembrete ao calendário.</p>`}
+    <div class="row"><button data-dl="ics">Adicionar lembrete ao calendário (.ics)</button></div>
+  </section>
+  <section class="card" style="display:grid;gap:12px"><h2>Baixar o app</h2>
+    ${IN_CLAUDE?`<p style="margin:0">A versão instalável está publicada em <a href="${SITE_URL}" target="_blank" rel="noopener">${SITE_URL.replace("https://","")}</a>. Abra no celular e instale na tela inicial. Ela funciona offline e envia notificações.</p>
+      <div class="row"><a class="btn" href="${SITE_URL}" target="_blank" rel="noopener" style="text-decoration:none">Abrir versão instalável</a><a class="btn" href="${SITE_URL}/#ajustes" target="_blank" rel="noopener" style="text-decoration:none">Baixar pacote .zip no site</a></div>`
+    :`<div class="row">${installEvt?`<button class="primary" id="install">Instalar na tela inicial</button>`:""}<button id="zipdl">Baixar pacote offline (.zip)</button></div>
+      <p class="note" style="margin:0">${ios?"No iPhone: toque em Compartilhar e depois em “Adicionar à Tela de Início”.":installEvt?"O app instalado abre em tela cheia e funciona sem internet.":"Se o botão de instalar não aparecer, use o menu do navegador: “Instalar app” ou “Adicionar à tela inicial”."} O .zip roda direto do computador: descompacte e abra o index.html.</p>`}
+  </section>
+  <section class="card" style="display:grid;gap:12px"><h2>Backup do progresso</h2>
+    <p class="note" style="margin:0">${IN_CLAUDE?"Aqui o progresso fica salvo na sua conta Claude.":"No site o progresso fica salvo neste aparelho."} As duas versões não sincronizam sozinhas: exporte o backup numa e importe na outra.</p>
+    <div class="row"><button data-dl="backup">Exportar backup (.json)</button><label class="btn" for="imp" style="cursor:pointer">Importar backup</label><input type="file" id="imp" accept="application/json,.json" hidden><button data-dl="report">Baixar relatório (.html)</button></div>
+    ${ui.importMsg?`<p class="note" style="margin:0">${esc(ui.importMsg)}</p>`:""}
+  </section>`;
+}
+function bindExtra(v){
+  v.querySelectorAll("[data-dl]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.dl, dt=TODAY();
+    if(k==="report") saveFile("relatorio-rota-anpd-"+dt+".html", reportHTML(), "text/html");
+    if(k==="ics") saveFile("lembrete-estudo-anpd.ics", icsText(), "text/calendar");
+    if(k==="backup") saveFile("backup-rota-anpd-"+dt+".json", JSON.stringify(S), "application/json");
+  });
+  const nt=$("#ntime"); if(nt) nt.addEventListener("change",()=>{ S.notif.time=nt.value||"19:00"; S.notif.sent={}; save(); toast("Horário salvo: "+S.notif.time); });
+  const on=$("#n-on"); if(on) on.onclick=async()=>{
+    if(S.notif.on && Notification.permission==="granted"){ S.notif.on=false; save(); render(); return; }
+    const p=await Notification.requestPermission(); S.notif.on = p==="granted"; save(); render();
+    if(p==="granted") showNotif("Rota ANPD","Notificações ativadas. Lembrete diário às "+S.notif.time+".");
+  };
+  const te=$("#n-test"); if(te) te.onclick=()=>showNotif("Rota ANPD · teste", notifBody());
+  const ins=$("#install"); if(ins) ins.onclick=async()=>{ installEvt.prompt(); await installEvt.userChoice.catch(()=>{}); installEvt=null; render(); };
+  const zb=$("#zipdl"); if(zb) zb.onclick=downloadZip;
+  const imp=$("#imp"); if(imp) imp.addEventListener("change",()=>{
+    const f=imp.files[0]; if(!f) return; const r=new FileReader();
+    r.onload=()=>{ try{ const o=JSON.parse(r.result); if(!o || typeof o!=="object" || !o.days || !Array.isArray(o.log)) throw 0; S=Object.assign(blank(),o); ensureDay(); save(); ui.importMsg="Backup importado: "+Object.keys(S.days).length+" dias e "+S.log.length+" respostas."; }catch(e){ ui.importMsg="Arquivo inválido. Use um backup exportado pelo Rota ANPD."; } render(); };
+    r.readAsText(f);
+  });
+}
+
+// ======== PACOTE OFFLINE (.zip gerado no navegador) ========
+function crc32(u8){ let c, t=crc32.t; if(!t){ t=crc32.t=new Uint32Array(256); for(let n=0;n<256;n++){ c=n; for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; t[n]=c>>>0; } } c=0xFFFFFFFF; for(let i=0;i<u8.length;i++) c=t[(c^u8[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+function zipStore(files){ // files: [{name, data:Uint8Array}]
+  const enc=new TextEncoder(), parts=[], central=[]; let off=0;
+  const u16=v=>[v&255,(v>>>8)&255], u32=v=>[v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255];
+  for(const f of files){ const nm=enc.encode(f.name), crc=crc32(f.data), sz=f.data.length;
+    const h=new Uint8Array([...u32(0x04034b50),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(sz),...u32(sz),...u16(nm.length),...u16(0)]);
+    parts.push(h,nm,f.data);
+    central.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(sz),...u32(sz),...u16(nm.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]),nm);
+    off+=h.length+nm.length+sz; }
+  const cdSize=central.reduce((s,a)=>s+a.length,0);
+  const end=new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cdSize),...u32(off),...u16(0)]);
+  return new Blob([...parts,...central,end],{type:"application/zip"});
+}
+async function downloadZip(){
+  try{
+    const names=["index.html","data.js","manifest.webmanifest","icon.svg","icon-192.png","icon-512.png"], files=[];
+    for(const n of names){ const r=await fetch(n,{cache:"no-store"}); if(!r.ok) throw 0; files.push({name:"rota-anpd/"+n,data:new Uint8Array(await r.arrayBuffer())}); }
+    files.push({name:"rota-anpd/LEIA-ME.txt",data:new TextEncoder().encode("Rota ANPD - app de estudos do Jullio\r\n\r\nUso offline: descompacte a pasta e abra o index.html no navegador.\r\nO progresso fica salvo no navegador usado. Para levar o progresso a outro aparelho, use Notificações e download > Exportar backup.\r\nVersão online e instalável: "+SITE_URL+"\r\n")});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(zipStore(files)); a.download="rota-anpd.zip"; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},800); toast("Download do pacote iniciado.");
+  }catch(e){ toast("Não foi possível montar o pacote. Verifique a conexão e tente de novo."); }
+}
+
+// ======== EVENTOS ========
+function bind(r){
+  const v=$("#view");
+  v.querySelectorAll("[data-task]").forEach(el=>el.addEventListener("change",e=>toggleTask(TODAY(),el.dataset.task,el.checked)));
+  const mn=$("#minutes"); if(mn) mn.addEventListener("change",()=>{ S.minutes=+mn.value; save(); toast("Tempo atualizado. Vale a partir de amanhã."); });
+  v.querySelectorAll("[data-gdisc]").forEach(b=>b.onclick=()=>{ ui.guideDisc=b.dataset.gdisc; render(); });
+  v.querySelectorAll("[data-guide]").forEach(c=>c.addEventListener("change",()=>{ S.guide[c.dataset.guide]=c.checked; save(); render(); }));
+  v.querySelectorAll("[data-tdisc]").forEach(b=>b.onclick=()=>{ ui.trainDisc=b.dataset.tdisc; render(); });
+  v.querySelectorAll("[data-start]").forEach(b=>b.onclick=()=>{
+    const m=b.dataset.start, k=TODAY(); ui.mode=m; ui.i=0; ui.ansMap={}; ui.res={};
+    if(m==="sim"){ ui.list=S.days[k].simIds; const f=ui.list.findIndex(id=>!(id in S.days[k].simAns)); ui.i=f<0?0:f; }
+    if(m==="rev") ui.list=Object.keys(S.err).filter(i=>S.err[i].due<=k && qById(i)).slice(0,20);
+    if(m==="weak"){ ui.list=weakList(); if(!ui.list.length){ ui.mode=null; toast("Responda mais questões para montar o treino."); return; } }
+    if(m==="train"){ const r=rng("t"+Date.now()); ui.list=allQ().filter(q=>q.d===ui.trainDisc).map(q=>q.id).sort(()=>r()-.5).slice(0,10); }
+    render();
+  });
+  v.querySelectorAll("[data-ans]").forEach(b=>b.onclick=()=>{
+    const id=ui.list[ui.i], q=qById(id); const raw=b.dataset.ans; const ch = q.t==="ce" ? raw==="true" : +raw;
+    if(ui.mode!=="sim" && id in ui.ansMap) return; const ok=answer(ui.mode,id,ch); ui.ansMap[id]=ch; ui.res[id]=ok; render();
+  });
+  v.querySelectorAll("[data-step]").forEach(b=>b.onclick=()=>{ ui.i+=+b.dataset.step; render(); });
+  v.querySelectorAll("[data-quit]").forEach(b=>b.onclick=()=>{ const m=ui.mode; ui.mode=null; render(); if(m==="sim" && S.days[TODAY()].simDone) toast("Simulado concluído e registrado."); });
+  v.querySelectorAll("[data-reset]").forEach(b=>b.onclick=()=>{ const a=b.dataset.reset; if(a==="ask") ui.confirmReset=true; else if(a==="no") ui.confirmReset=false; else { ui.confirmReset=false; S=blank(); ensureDay(); save(); toast("Progresso apagado."); } render(); });
+  const ai=$("#ai-gen"); if(ai) ai.onclick=genAI;
+  bindExtra(v);
+}
+
+async function genAI(){
+  if(!sample || ui.ai.busy) return; const d=ui.trainDisc;
+  ui.ai={busy:true,msg:"Gerando questões de "+DISC[d].s+"…"}; render();
+  const g=GUIDES[d];
+  const prompt=`Você é examinador de concursos. Crie 5 questões INÉDITAS para o concurso de Especialista em Regulação de Proteção de Dados da ANPD (Brasil), disciplina: ${DISC[d].n}.
+Tópicos: ${g.topics.map(t=>t.t).join("; ")}.
+Use apenas fatos de que tenha certeza e cite o dispositivo legal. Misture 3 questões de certo/errado (estilo Cebraspe) e 2 de múltipla escolha com 5 alternativas (estilo FGV).
+Responda SOMENTE um array JSON com objetos: {"t":"ce"|"me","q":"enunciado","o":["A","B","C","D","E"] (só para "me"),"a": true/false para "ce" ou índice 0-4 para "me","c":"comentário curto explicando o gabarito","r":"referência legal"}.`;
+  try{
+    const arr = await sample.json(prompt,{modelTier:"default"});
+    const ts=Date.now().toString(36); let n=0;
+    (Array.isArray(arr)?arr:[]).forEach((x,i)=>{ if(!x||!x.q||(x.t!=="ce"&&x.t!=="me")) return; if(x.t==="me"&&(!Array.isArray(x.o)||typeof x.a!=="number")) return; if(x.t==="ce"&&typeof x.a!=="boolean") return;
+      S.aiQ.push({id:"ai"+ts+i,d,t:x.t,e:"IA",q:String(x.q),o:x.o,a:x.a,c:String(x.c||""),r:String(x.r||"")}); n++; });
+    if(S.aiQ.length>120) S.aiQ=S.aiQ.slice(-120);
+    save(); ui.ai={busy:false,msg:n+" questões novas de "+DISC[d].s+" adicionadas ao banco. Use “Treinar” para respondê-las."};
+  }catch(e){ ui.ai={busy:false,msg: e&&e.code==="not_granted"?"Permissão para usar o Claude não concedida.":e&&e.code==="rate_limited"?"Limite de uso atingido. Tente mais tarde.":"Não foi possível gerar agora. Tente novamente em instantes."}; }
+  render();
+}
+
+if(!location.hash) history.replaceState(null,"","#hoje");
+ensureDay();
+boot();
+</script>
