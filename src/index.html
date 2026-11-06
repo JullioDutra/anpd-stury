@@ -149,7 +149,7 @@ ol.rules{margin:0;padding-left:20px;display:grid;gap:8px;max-width:72ch}
   <div class="wrap">
     <div class="brand"><b>Rota <span>ANPD</span> · Jullio</b><span class="sync" id="sync">conectando…</span></div>
     <nav class="tabs" id="tabs">
-      <a href="#hoje">Hoje</a><a href="#simulado">Simulado</a><a href="#relatorio">Relatório</a><a href="#ciclo">Ciclo</a><a href="#guias">Guias</a><a href="#progresso">Progresso</a><a href="#plano">Plano</a><a href="#novidades">Novidades</a><a href="#ajustes">Notificações e download</a>
+      <a href="#hoje">Hoje</a><a href="#simulado">Simulado</a><a href="#relatorio">Relatório</a><a href="#ciclo">Ciclo</a><a href="#guias">Guias</a><a href="#redacao">Redação</a><a href="#progresso">Progresso</a><a href="#plano">Plano</a><a href="#novidades">Novidades</a><a href="#ajustes">Notificações e download</a>
     </nav>
   </div>
 </header>
@@ -316,7 +316,7 @@ function alerts(){
 }
 
 // ======== VIEWS ========
-const VIEWS = {hoje:vHoje, simulado:vSimulado, relatorio:vRelatorio, ciclo:vCiclo, guias:vGuias, progresso:vProgresso, plano:vPlano, novidades:vNovidades, ajustes:vAjustes};
+const VIEWS = {redacao:vRedacao, hoje:vHoje, simulado:vSimulado, relatorio:vRelatorio, ciclo:vCiclo, guias:vGuias, progresso:vProgresso, plano:vPlano, novidades:vNovidades, ajustes:vAjustes};
 let ui = {mode:null, list:[], i:0, ansMap:{}, res:{}, guideDisc:"lgpd", trainDisc:"lgpd", ai:{busy:false,msg:""}};
 function route(){ const h=(location.hash||"#hoje").slice(1); return VIEWS[h]?h:"hoje"; }
 function render(){
@@ -449,6 +449,7 @@ function vGuias(){
   <section class="card" style="display:grid;gap:10px"><div class="row" style="justify-content:space-between"><b>O que cai</b><span class="ref">${done}/${g.topics.length} dominados</span></div><p style="margin:0;max-width:70ch">${esc(g.cai)}</p></section>
   <div style="display:grid;gap:8px">${g.topics.map((t,i)=>`<details class="topic"><summary><input type="checkbox" data-guide="${d}-${i}" ${S.guide[d+"-"+i]?"checked":""} aria-label="Marcar como dominado" onclick="event.stopPropagation()">${esc(t.t)}</summary>
     <div class="body"><ul>${t.b.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><div class="trap"><b>Pegadinha:</b> ${esc(t.p)}</div></div></details>`).join("")}</div>
+  ${g.links?`<section class="card" style="display:grid;gap:8px"><b>Onde estudar (fontes oficiais)</b><ul style="margin:0;padding-left:18px;display:grid;gap:4px">${g.links.map(l=>`<li><a href="${esc(l[1])}" target="_blank" rel="noopener">${esc(l[0])}</a></li>`).join("")}</ul></section>`:""}
   <p class="note">Marque um tópico como dominado quando acertar pelo menos 4 de 5 questões sobre ele.</p>`;
 }
 
@@ -595,8 +596,10 @@ function vRelatorio(){
   if(ui.mode) return vQuiz();
   const R=reportData(), top=R.rows.slice(0,3), ins=insights(R);
   return `
-  <section style="display:grid;gap:6px"><div class="eyebrow">Relatório de evolução · ${esc(fmtDate(TODAY()))}</div><h1 style="font-size:1.8rem">Onde Jullio mais precisa evoluir</h1>
+  <section style="display:grid;gap:6px"><div class="eyebrow">Relatório de evolução · ${esc(fmtDate(TODAY()))}</div><h1 style="font-size:1.8rem">Medidor de evolução do Jullio</h1>
   <p class="muted" style="margin:0;max-width:68ch">A prioridade combina o peso da disciplina no ciclo, a distância até 80% de acerto nos últimos 30 dias e os tópicos do guia ainda não dominados.</p></section>
+  ${vMedidor()}
+  <h2 style="margin-top:8px">Onde focar agora</h2>
   <div class="grid2">${top.map((r,i)=>`<section class="card" style="display:grid;gap:8px"><div class="row" style="justify-content:space-between"><span class="eyebrow">Prioridade ${i+1}</span><span class="ref">${r.a==null?"sem dados":Math.round(r.a*100)+"% de acerto"}</span></div><h2>${esc(DISC[r.d].s)}</h2><p style="margin:0">${esc(actionFor(r))}</p><p class="note" style="margin:0">${r.n} questões respondidas · ${r.gd}/${r.gt} tópicos dominados</p></section>`).join("")}</div>
   <section class="card" style="display:grid;gap:10px"><h2>Diagnóstico</h2>
     ${ins.length?`<ul style="margin:0;padding-left:18px;display:grid;gap:6px;max-width:72ch">${ins.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<p class="muted" style="margin:0">Sem pontos de atenção além das prioridades acima.</p>`}
@@ -737,6 +740,131 @@ async function downloadZip(){
   }catch(e){ toast("Não foi possível montar o pacote. Verifique a conexão e tente de novo."); }
 }
 
+// ======== MEDIDOR DE EVOLUÇÃO ========
+function weekStart(k){ const d=parseKey(k), wd=(d.getDay()+6)%7; return addDays(k,-wd); }
+function weekStats(ws){
+  const we=addDays(ws,6), a=acc(ws,we); let days=0, essays=0;
+  for(let i=0;i<7;i++){ const k=addDays(ws,i); if(dayCounts(k)) days++; }
+  (S.essayLog||[]).forEach(k=>{ if(k>=ws && k<=we) essays++; });
+  return {ws,we,n:a.n,ok:a.ok,p:a.p,days,essays};
+}
+function readiness(){
+  const t=TODAY(), R=reportData();
+  let tot=0, dom=0; Object.keys(GUIDES).forEach(d=>GUIDES[d].topics.forEach((_,i)=>{ tot++; if(S.guide[d+"-"+i]) dom++; }));
+  let wsum=0, asum=0; R.rows.forEach(r=>{ wsum+=r.w; asum+=r.w*(r.a==null?0:Math.min(1,r.a/0.8)); });
+  const span=Math.min(14,diffDays(S.start,t)+1); let dd=0; for(let i=0;i<span;i++) if(dayCounts(addDays(t,-i))) dd++;
+  const parts=[
+    {k:"Cobertura do conteúdo",v:dom/tot,w:30,info:dom+" de "+tot+" tópicos dominados"},
+    {k:"Acerto ponderado pelo peso",v:asum/wsum,w:40,info:"alvo: 80% em cada disciplina"},
+    {k:"Consistência (14 dias)",v:dd/Math.max(1,span),w:20,info:dd+" de "+span+" dias com meta"},
+    {k:"Volume de questões",v:Math.min(1,R.total.n/1000),w:10,info:R.total.n+" de 1.000 questões"}
+  ];
+  const score=Math.round(parts.reduce((s,p)=>s+p.v*p.w,0));
+  const level= score<25?"Base em construção": score<50?"Em desenvolvimento": score<70?"Competitivo": score<85?"Aprovável":"Pronto para a prova";
+  return {score,parts,level};
+}
+function milestones(){
+  const R=reportData(), st=streaks(), ds=discStats(), lg=ds.lgpd;
+  const lgTopics=GUIDES.lgpd.topics.length, lgDone=GUIDES.lgpd.topics.filter((_,i)=>S.guide["lgpd-"+i]).length;
+  return [
+    ["Primeiro simulado completo", Object.values(S.days).some(d=>d.simDone)],
+    ["100 questões respondidas", R.total.n>=100],
+    ["500 questões respondidas", R.total.n>=500],
+    ["1.000 questões respondidas", R.total.n>=1000],
+    ["7 dias seguidos de meta", st.best>=7],
+    ["30 dias seguidos de meta", st.best>=30],
+    ["Primeira volta completa do ciclo", S.cyclePos>=CYCLE.length],
+    ["Todos os tópicos de LGPD dominados", lgDone===lgTopics],
+    ["LGPD com 75% de acerto (mín. 30 questões)", lg.n>=30 && lg.ok/lg.n>=0.75],
+    ["Primeira redação concluída", (S.essayLog||[]).length>=1],
+    ["Acerto geral de 70% (mín. 200 questões)", R.total.n>=200 && R.total.p>=0.7]
+  ];
+}
+function vMedidor(){
+  const ph=phaseInfo(), G=PHASE_GOALS[ph.idx], t=TODAY(), cur=weekStats(weekStart(t)), rd=readiness(), ms=milestones();
+  const bar=(v,goal,fmt)=>{ const p=Math.max(0,Math.min(1,goal?v/goal:0)); return `<div class="bar" style="flex:1"><i style="width:${p*100}%;background:${p>=1?"var(--good)":"var(--accent)"}"></i></div><span class="ref">${fmt}</span>`; };
+  const hist=[]; for(let i=7;i>=0;i--) hist.push(weekStats(addDays(weekStart(t),-7*i)));
+  const R=reportData(), gtot=Object.keys(GUIDES).reduce((s,d)=>s+GUIDES[d].topics.length,0), gdone=Object.keys(S.guide).filter(k=>S.guide[k]).length;
+  const weeks=Math.max(1,Math.ceil((diffDays(S.start,t)+1)/7)), pace=gdone/weeks, left=gtot-gdone;
+  return `
+  <section class="card" style="display:grid;gap:12px">
+    <div class="row" style="justify-content:space-between"><h2>Índice de prontidão</h2><span class="chip">${esc(rd.level)}</span></div>
+    <div class="row" style="align-items:baseline;gap:8px"><span class="daynum" style="font-size:3rem">${rd.score}</span><span class="muted">de 100</span></div>
+    ${rd.parts.map(p=>`<div class="hbar" style="grid-template-columns:180px 1fr 60px"><span>${esc(p.k)} <span class="muted">(${p.w})</span></span><span class="t" title="${esc(p.info)}"><i style="width:${Math.round(p.v*100)}%"></i></span><span class="v">${Math.round(p.v*p.w)}/${p.w}</span></div>`).join("")}
+    <p class="note" style="margin:0">Faixas: 0–24 base em construção · 25–49 em desenvolvimento · 50–69 competitivo · 70–84 aprovável · 85+ pronto para a prova.</p>
+  </section>
+  <section class="card" style="display:grid;gap:10px">
+    <div class="row" style="justify-content:space-between"><h2>Metas desta semana</h2><span class="ref">${esc(PHASES[ph.idx].n)}</span></div>
+    <div class="row">${"Questões"}${bar(cur.n,G.q,cur.n+"/"+G.q)}</div>
+    <div class="row">Dias com meta${bar(cur.days,G.days,cur.days+"/"+G.days)}</div>
+    <div class="row">Acerto${bar(cur.p||0,G.acc,cur.p==null?"–":Math.round(cur.p*100)+"% / "+Math.round(G.acc*100)+"%")}</div>
+    ${G.essays?`<div class="row">Redações${bar(cur.essays,G.essays,cur.essays+"/"+G.essays)}</div>`:""}
+    <p class="note" style="margin:0">As metas sobem a cada fase. Semana de segunda a domingo.</p>
+  </section>
+  <section class="card" style="display:grid;gap:10px"><h2>Histórico semanal</h2>
+    <div class="tbl"><table class="plan"><thead><tr><th>Semana</th><th>Questões</th><th>Acerto</th><th>Dias com meta</th><th>Redações</th></tr></thead><tbody>
+    ${hist.filter(w=>w.we>=S.start).map(w=>`<tr><td>${esc(fmtDate(w.ws))}</td><td>${w.n}</td><td>${w.p==null?"–":Math.round(w.p*100)+"%"}</td><td>${w.days}/7</td><td>${w.essays}</td></tr>`).join("")}
+    </tbody></table></div>
+  </section>
+  <section class="card" style="display:grid;gap:10px"><h2>Projeção</h2>
+    <p style="margin:0;max-width:70ch">${gdone?`No ritmo atual (${pace.toFixed(1)} tópicos dominados por semana), faltam cerca de <b>${Math.ceil(left/Math.max(pace,0.1))} semanas</b> para dominar os ${left} tópicos restantes.`:`Marque tópicos como dominados nos Guias para o app projetar quando você cobre todo o conteúdo.`} ${R.total.p!=null&&R.total.p<0.7?"Antes disso, a prioridade é levar o acerto geral a 70%.":""}</p>
+  </section>
+  <section class="card" style="display:grid;gap:10px"><h2>Marcos</h2>
+    <ul class="tasks">${ms.map(m=>`<li class="${m[1]?"done":""}" style="grid-template-columns:28px 1fr"><span aria-hidden="true" style="font-weight:700;color:${m[1]?"var(--good)":"var(--muted)"}">${m[1]?"✓":"○"}</span><span class="tl" style="${m[1]?"text-decoration:none":""}">${esc(m[0])}</span></li>`).join("")}</ul>
+  </section>`;
+}
+
+// ======== REDAÇÃO ========
+function vRedacao(){
+  const E=ESSAY_GUIDE, i=ui.essayIdx||0, tm=E.temas[i], draft=(S.essays||{})[i]||{}, txt=draft.text||"";
+  const words=txt.trim()?txt.trim().split(/\s+/).length:0, lines=Math.ceil(txt.length/70);
+  const cats=[...new Set(E.repertorio.map(r=>r[0]))];
+  return `
+  <section style="display:grid;gap:6px"><div class="eyebrow">Parte escrita</div><h1 style="font-size:1.8rem">Redação e repertório</h1>
+  <p class="muted" style="margin:0;max-width:70ch">${esc(E.aviso)}</p></section>
+  <div class="grid2">
+    <section class="card"><h2>Estrutura do texto</h2><ol class="rules" style="margin-top:8px">${E.estrutura.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></section>
+    <section class="card"><h2>Checklist de correção</h2><ul class="rules" style="margin-top:8px">${E.criterios.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></section>
+  </div>
+  <section class="card" style="display:grid;gap:10px"><h2>Temas prováveis</h2>
+    <div class="disc-pick">${E.temas.map((x,j)=>`<button data-etema="${j}" aria-pressed="${j===i}">Tema ${j+1}${(S.essays||{})[j]&&S.essays[j].done?" ✓":""}</button>`).join("")}</div>
+    <h3>${esc(tm.t)}</h3>
+    <div class="grid2">
+      <div><b>Tópicos a abordar</b><ul>${tm.topicos.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><b>Normas para citar</b><ul>${tm.normas.map(x=>`<li><span class="ref">${esc(x)}</span></li>`).join("")}</ul></div>
+      <div><b>Argumentos</b><ul>${tm.args.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><b>Proposta de conclusão</b><p style="margin:4px 0 0">${esc(tm.proposta)}</p></div>
+    </div>
+    <label for="essay" class="eyebrow">Seu texto (rascunho salvo automaticamente)</label>
+    <textarea id="essay" rows="14" style="width:100%;font:inherit;line-height:1.6;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)" placeholder="Escreva aqui em até 40 minutos, sem consulta.">${esc(txt)}</textarea>
+    <div class="row" style="justify-content:space-between"><span class="ref" id="ecount">${words} palavras · ~${lines} linhas</span>
+      <div class="row"><button id="e-done">${draft.done?"Concluída ✓":"Marcar como concluída"}</button>${sample?`<button class="primary" id="e-ai" ${ui.essayBusy?"disabled":""}>${ui.essayBusy?"Corrigindo…":"Corrigir com IA"}</button>`:""}</div></div>
+    ${draft.fb?`<div class="feedback"><b>Correção (IA, orientativa):</b><div style="white-space:pre-wrap;margin-top:6px">${esc(draft.fb)}</div></div>`:""}
+  </section>
+  <section class="card" style="display:grid;gap:10px"><h2>Banco de repertório</h2>
+    ${cats.map(c=>`<div><div class="eyebrow" style="margin-bottom:4px">${esc(c)}</div><ul style="margin:0;padding-left:18px;display:grid;gap:4px;max-width:72ch">${E.repertorio.filter(r=>r[0]===c).map(r=>`<li>${esc(r[1])}</li>`).join("")}</ul></div>`).join("")}
+    <p class="note" style="margin:0">Use repertório como apoio ao argumento, sem decorar números que você não tem certeza.</p>
+  </section>`;
+}
+let essayTimer=null;
+function bindRedacao(v){
+  v.querySelectorAll("[data-etema]").forEach(b=>b.onclick=()=>{ ui.essayIdx=+b.dataset.etema; render(); });
+  const ta=$("#essay"); if(!ta) return; const i=ui.essayIdx||0;
+  ta.addEventListener("input",()=>{ const txt=ta.value, w=txt.trim()?txt.trim().split(/\s+/).length:0; $("#ecount").textContent=w+" palavras · ~"+Math.ceil(txt.length/70)+" linhas";
+    clearTimeout(essayTimer); essayTimer=setTimeout(()=>{ S.essays=S.essays||{}; S.essays[i]=Object.assign({},S.essays[i],{text:txt,at:TODAY()}); save(); },800); });
+  $("#e-done").onclick=()=>{ S.essays=S.essays||{}; const d=S.essays[i]=Object.assign({},S.essays[i],{text:ta.value}); if(!d.done){ d.done=TODAY(); S.essayLog=(S.essayLog||[]).concat(TODAY()); toast("Redação registrada no medidor."); } save(); render(); };
+  const ai=$("#e-ai"); if(ai) ai.onclick=async()=>{
+    const txt=ta.value.trim(); if(txt.split(/\s+/).length<80){ toast("Escreva pelo menos 80 palavras antes de corrigir."); return; }
+    ui.essayBusy=true; render(); const tm=ESSAY_GUIDE.temas[i];
+    try{ const r=await sample(`Você é corretor de provas discursivas de concursos de agências reguladoras (padrão Cebraspe). Corrija o texto abaixo sobre o tema: "${tm.t}". Tópicos esperados: ${tm.topicos.join("; ")}.
+Dê: 1) nota de 0 a 10 para conteúdo (cobertura dos tópicos e fundamentação legal) e de 0 a 10 para expressão (gramática, coesão); 2) três pontos fortes; 3) três ajustes concretos, citando trechos; 4) uma sugestão de repertório ou norma que faltou. Seja direto, em português, sem markdown.
+
+TEXTO:
+${txt}`,{modelTier:"default"});
+      S.essays[i]=Object.assign({},S.essays[i],{text:ta.value,fb:r.text}); save();
+    }catch(e){ toast(e&&e.code==="not_granted"?"Permissão para usar o Claude não concedida.":"Não foi possível corrigir agora."); }
+    ui.essayBusy=false; render();
+  };
+}
+
 // ======== EVENTOS ========
 function bind(r){
   const v=$("#view");
@@ -762,6 +890,7 @@ function bind(r){
   v.querySelectorAll("[data-reset]").forEach(b=>b.onclick=()=>{ const a=b.dataset.reset; if(a==="ask") ui.confirmReset=true; else if(a==="no") ui.confirmReset=false; else { ui.confirmReset=false; S=blank(); ensureDay(); save(); toast("Progresso apagado."); } render(); });
   const ai=$("#ai-gen"); if(ai) ai.onclick=genAI;
   bindExtra(v);
+  if(r==="redacao") bindRedacao(v);
 }
 
 async function genAI(){

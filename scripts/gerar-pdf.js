@@ -7,8 +7,8 @@ const { chromium } = require('playwright');
 const root = path.join(__dirname, '..');
 const ctx = {};
 new Function('ctx', fs.readFileSync(path.join(root, 'src/data.js'), 'utf8') +
-  ';ctx.DISC=DISC;ctx.CYCLE=CYCLE;ctx.GUIDES=GUIDES;ctx.QB=QB;ctx.UPDATES=UPDATES;ctx.ESSAYS=ESSAYS;')(ctx);
-const { DISC, CYCLE, GUIDES, QB, UPDATES, ESSAYS } = ctx;
+  ';ctx.DISC=DISC;ctx.CYCLE=CYCLE;ctx.GUIDES=GUIDES;ctx.QB=QB;ctx.UPDATES=UPDATES;ctx.ESSAYS=ESSAYS;ctx.ESSAY_GUIDE=ESSAY_GUIDE;ctx.PHASE_GOALS=PHASE_GOALS;')(ctx);
+const { DISC, CYCLE, GUIDES, QB, UPDATES, ESSAYS, ESSAY_GUIDE, PHASE_GOALS } = ctx;
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const L = 'ABCDE';
@@ -21,6 +21,14 @@ ORDER.forEach(d => QB.filter(q => q.d === d).forEach(q => qs.push(q)));
 qs.forEach((q, i) => q.n = i + 1);
 
 const css = `
+
+.links { font-size: 9pt; background: #EEF1F7; padding: 2.5mm 3.5mm; border-radius: 1.5mm; margin-bottom: 4mm; break-inside: avoid; }
+.links ul { margin: 1mm 0 0; } .links .url { font-family: "JetBrains Mono", monospace; font-size: 7.5pt; color: #1C3AA9; word-break: break-all; }
+.essay { border-top: 0.5pt solid #CBD2DE; padding-top: 2mm; }
+.lines div { border-bottom: 0.5pt solid #CBD2DE; height: 7.5mm; position: relative; }
+.lines span { position: absolute; left: -6mm; bottom: 1mm; font-family: "JetBrains Mono", monospace; font-size: 7pt; color: #8A93A6; }
+.lines { margin-left: 6mm; }
+.sheet td { height: 9mm; }
 @page { size: A4; margin: 18mm 17mm 20mm 17mm; }
 * { box-sizing: border-box; }
 body { font-family: "Bitstream Charter", "Caladea", Georgia, serif; font-size: 10.5pt; line-height: 1.5; color: #141C2B; margin: 0; }
@@ -86,7 +94,7 @@ h += `<section class="cover">
 const chapters = [['1', 'Como usar esta apostila e plano diário'], ['2', 'Situação do concurso e novidades normativas']];
 ORDER.forEach((d, i) => chapters.push([String(i + 3), 'Guia: ' + DISC[d].n]));
 const qCh = ORDER.length + 3;
-chapters.push([String(qCh), 'Caderno de questões'], [String(qCh + 1), 'Gabarito comentado'], [String(qCh + 2), 'Discursiva: temas e roteiro'], [String(qCh + 3), 'Checklist de revisão']);
+chapters.push([String(qCh), 'Caderno de questões'], [String(qCh + 1), 'Gabarito comentado'], [String(qCh + 2), 'Parte escrita: redação e repertório'], [String(qCh + 3), 'Medidor de evolução: metas e acompanhamento'], [String(qCh + 4), 'Checklist de revisão']);
 h += `<section class="chapter"><div class="chapter-head"><div class="eyebrow">Sumário</div><h1>Conteúdo</h1></div><ul class="toc">${chapters.map(c => `<li><span class="num">${c[0]}</span><span>${esc(c[1])}</span></li>`).join('')}</ul></section>`;
 
 // 1. Plano
@@ -125,6 +133,7 @@ ORDER.forEach((d, i) => {
   const g = GUIDES[d];
   h += `<section class="chapter"><div class="chapter-head"><div class="eyebrow">Capítulo ${i + 3} · ${QB.filter(q => q.d === d).length} questões no caderno</div><h1>${esc(DISC[d].n)}</h1></div>
   <p class="lead">${esc(g.cai)}</p>
+  ${g.links ? `<div class="links"><b class="sans">Onde estudar (fontes oficiais)</b><ul>${g.links.map(l => `<li>${esc(l[0])}: <span class="url">${esc(l[1])}</span></li>`).join('')}</ul></div>` : ''}
   ${g.topics.map((t, j) => `<div class="topic"><h3><span class="check"></span>${i + 3}.${j + 1} ${esc(t.t)}</h3><ul>${t.b.map(b => `<li>${esc(b)}</li>`).join('')}</ul><div class="trap"><b>Pegadinha:</b> ${esc(t.p)}</div></div>`).join('')}
   </section>`;
 });
@@ -147,14 +156,51 @@ h += `<section class="chapter"><div class="chapter-head"><div class="eyebrow">Ca
 <h2>Gabarito rápido</h2><div class="grid">${qs.map(q => `<span>${q.n}·${gab(q)}</span>`).join('')}</div>
 <h2>Comentários</h2>${qs.map(q => `<div class="ans"><b>${q.n}.</b> <span class="g">${gab(q)}</span> · ${esc(q.c)} <span class="ref">${esc(q.r)}</span></div>`).join('')}</section>`;
 
-// Discursiva
-h += `<section class="chapter"><div class="chapter-head"><div class="eyebrow">Capítulo ${qCh + 2}</div><h1>Discursiva</h1></div>
-<p class="lead">Agências reguladoras costumam cobrar texto dissertativo de 20 a 30 linhas. Escreva à mão, com 40 minutos cronometrados, uma redação por semana a partir da Fase 2.</p>
-<h2>Roteiro</h2><ol><li><b>Introdução (3–4 linhas):</b> contextualize e apresente a tese.</li><li><b>Desenvolvimento 1:</b> fundamento normativo, citando artigo ou resolução.</li><li><b>Desenvolvimento 2:</b> desafio prático ou contraponto, com exemplo.</li><li><b>Conclusão:</b> proposta concreta e papel da ANPD.</li></ol>
-<h2>Temas propostos</h2><table><tr><th>#</th><th>Tema</th><th>Feito em</th></tr>${ESSAYS.map((t, i) => `<tr><td class="mono">${i + 1}</td><td>${esc(t)}</td><td style="width:28mm"></td></tr>`).join('')}</table></section>`;
+// Parte escrita
+const EG = ESSAY_GUIDE;
+h += `<section class="chapter"><div class="chapter-head"><div class="eyebrow">Capítulo ${qCh + 2}</div><h1>Parte escrita: redação e repertório</h1></div>
+<p class="lead">${esc(EG.aviso)}</p>
+<h2>Estrutura do texto (20 a 30 linhas)</h2><ol>${EG.estrutura.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
+<h2>Checklist de correção</h2><ul>${EG.criterios.map(x => `<li><span class="check"></span>${esc(x)}</li>`).join('')}</ul>
+<h2>Banco de repertório</h2>
+<table><tr><th>Tipo</th><th>Repertório</th></tr>${EG.repertorio.map(r => `<tr><td class="sans" style="white-space:nowrap">${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table>
+<h2>Temas prováveis com roteiro</h2>
+${EG.temas.map((t, k) => `<div class="topic essay"><h3>Tema ${k + 1}. ${esc(t.t)}</h3>
+<p><b class="sans">Tópicos:</b> ${t.topicos.map(esc).join('; ')}.</p>
+<p><b class="sans">Normas para citar:</b> ${t.normas.map(n => `<span class="ref">${esc(n)}</span>`).join(' ')}</p>
+<p><b class="sans">Argumentos:</b></p><ul>${t.args.map(a => `<li>${esc(a)}</li>`).join('')}</ul>
+<p><b class="sans">Proposta de conclusão:</b> ${esc(t.proposta)}</p>
+<p class="note">Feito em: ____/____/______ · Nota de conteúdo: ____ · Nota de expressão: ____</p></div>`).join('')}
+<h2>Folha de rascunho</h2><div class="lines">${Array.from({ length: 30 }, (_, k) => `<div><span>${k + 1}</span></div>`).join('')}</div>
+</section>`;
+
+// Medidor
+const fases = ['Fundamentos (sem. 1–6)', 'Aprofundamento (sem. 7–12)', 'Edital (sem. 13–20)', 'Reta final'];
+h += `<section class="chapter"><div class="chapter-head"><div class="eyebrow">Capítulo ${qCh + 3}</div><h1>Medidor de evolução</h1></div>
+<p class="lead">O app calcula estes números sozinho na aba Relatório. Esta folha serve para acompanhar à mão, toda semana, no check-in de domingo.</p>
+<h2>Índice de prontidão (0 a 100)</h2>
+<table><tr><th>Componente</th><th>Peso</th><th>Como medir</th></tr>
+<tr><td>Cobertura do conteúdo</td><td>30</td><td>Tópicos dominados ÷ total de tópicos dos guias</td></tr>
+<tr><td>Acerto ponderado</td><td>40</td><td>Acerto de cada disciplina ÷ 80%, ponderado pelo peso no ciclo</td></tr>
+<tr><td>Consistência</td><td>20</td><td>Dias com meta cumprida nos últimos 14 dias</td></tr>
+<tr><td>Volume</td><td>10</td><td>Questões respondidas ÷ 1.000</td></tr></table>
+<p>Faixas: 0–24 base em construção · 25–49 em desenvolvimento · 50–69 competitivo · 70–84 aprovável · 85+ pronto para a prova.</p>
+<h2>Metas semanais por fase</h2>
+<table><tr><th>Fase</th><th>Questões/semana</th><th>Dias com meta</th><th>Acerto mínimo</th><th>Redações</th></tr>
+${PHASE_GOALS.map((g, k) => `<tr><td>${fases[k]}</td><td>${g.q}</td><td>${g.days} de 7</td><td>${Math.round(g.acc * 100)}%</td><td>${g.essays}</td></tr>`).join('')}</table>
+<h2>Marcos</h2><ul>${['Primeiro simulado completo', '100 questões respondidas', '500 questões respondidas', '1.000 questões respondidas', '7 dias seguidos de meta', '30 dias seguidos de meta', 'Primeira volta completa do ciclo', 'Todos os tópicos de LGPD dominados', 'LGPD com 75% de acerto (mín. 30 questões)', 'Primeira redação concluída', 'Acerto geral de 70% (mín. 200 questões)'].map(m => `<li><span class="check"></span>${m}</li>`).join('')}</ul>
+<h2>Planilha semanal (12 semanas)</h2>
+<table class="sheet"><tr><th>Sem.</th><th>Início</th><th>Questões</th><th>Acerto</th><th>Dias com meta</th><th>Redações</th><th>Tópicos dominados</th><th>Índice</th><th>Disciplina mais fraca</th></tr>
+${Array.from({ length: 12 }, (_, k) => `<tr><td class="mono">${k + 1}</td>${'<td></td>'.repeat(8)}</tr>`).join('')}</table>
+<h2>Regras de ajuste</h2><ul>
+<li>Acerto abaixo de 60% por 2 semanas: reduza teoria nova e dobre a revisão de erros.</li>
+<li>Menos de 4 dias com meta: reduza o tempo diário para algo que você cumpra todo dia.</li>
+<li>Uma disciplina abaixo de 55%: releia o guia dela e faça 2 treinos extras na semana.</li>
+<li>Índice estagnado por 3 semanas: troque a técnica (resumo → questões comentadas, lei seca em voz alta).</li></ul>
+</section>`;
 
 // Checklist
-h += `<section class="chapter"><div class="chapter-head"><div class="eyebrow">Capítulo ${qCh + 3}</div><h1>Checklist de revisão</h1></div>
+h += `<section class="chapter"><div class="chapter-head"><div class="eyebrow">Capítulo ${qCh + 4}</div><h1>Checklist de revisão</h1></div>
 <p class="lead">Marque o tópico quando acertar pelo menos 4 de 5 questões sobre ele.</p>
 <table><tr><th>Disciplina</th><th>Tópico</th><th>1ª rev.</th><th>2ª rev.</th><th>3ª rev.</th></tr>${ORDER.map(d => GUIDES[d].topics.map((t, j) => `<tr><td>${j === 0 ? esc(DISC[d].s) : ''}</td><td>${esc(t.t)}</td><td><span class="check"></span></td><td><span class="check"></span></td><td><span class="check"></span></td></tr>`).join('')).join('')}</table></section>`;
 
