@@ -96,6 +96,8 @@ select{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--li
 .qnav{display:flex;gap:4px;flex-wrap:wrap}
 .qnav span{width:28px;height:28px;display:grid;place-items:center;border-radius:6px;font-family:var(--f-mono);font-size:.75rem;background:var(--sunk);color:var(--muted)}
 .qnav span.cur{outline:2px solid var(--accent)}
+.qnav span.sel{background:var(--accent-soft);color:var(--accent)}
+.opts button.sel,.ce button.sel{border-color:var(--accent);background:var(--accent-soft);opacity:1}
 .qnav span.ok{background:var(--good);color:var(--surface)} .qnav span.no{background:var(--bad);color:var(--surface)}
 /* Ciclo */
 .cycle{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
@@ -219,19 +221,43 @@ function toast(t){ const el=$("#toast"); el.textContent=t; el.hidden=false; clea
 // ======== PLANO DO DIA ========
 function blocksFor(m){ return m<=60?1 : m<=120?2 : 3; }
 function blockMin(m){ return m<=60?35 : m<=90?30 : m<=120?40 : 45; }
+function markTask(type){ const d=S.days[TODAY()]; if(!d) return; const t=d.tasks.find(x=>x.type===type&&!x.done); if(t) t.done=true; }
+function nextLei(){ const L=S.lei||{}; return LEI_BLOCKS.slice().sort((a,b)=>((L[a.id]||{}).n||0)-((L[b.id]||{}).n||0))[0]; }
+const MODES={padrao:"padrão",recuperacao:"recuperação",revisao:"revisão",avanco:"avanço"};
+function dayStrategy(k){
+  const a=acc(addDays(k,-7),addDays(k,-1)), due=Object.keys(S.err).filter(i=>S.err[i].due<=k).length, wd=parseKey(k).getDay(), ph=phaseInfo().idx;
+  let mode="padrao", why="Ritmo normal: avance no ciclo e mantenha as revisões.";
+  if(a.n>=20 && a.p<0.6){ mode="recuperacao"; why="Acerto de "+Math.round(a.p*100)+"% nos últimos 7 dias. Hoje há um bloco a menos de teoria e um treino de pontos fracos."; }
+  else if(due>=15){ mode="revisao"; why="Há "+due+" erros aguardando revisão. Hoje a revisão vem primeiro e é mais longa."; }
+  else if(a.n>=30 && a.p>=0.8){ mode="avanco"; why="Acerto de "+Math.round(a.p*100)+"% nos últimos 7 dias. Hoje entra uma questão discursiva para subir o nível."; }
+  if(wd===0) why+=" Domingo: simuladão cronometrado e check-in semanal.";
+  if(wd===6) why+=" Sábado: dia da parte escrita e da lei seca.";
+  return {mode,why,wd,ph};
+}
 function ensureDay(k=TODAY()){
-  if(S.days[k]) return S.days[k];
-  const n = blocksFor(S.minutes), tp = Object.assign({}, S.topicPos), tasks = [];
+  const ex=S.days[k];
+  if(ex && (ex.v2 || k!==TODAY() || ex.tasks.some(t=>t.done) || Object.keys(ex.simAns||{}).length)) return ex;
+  const st=dayStrategy(k), M=S.minutes, wd=st.wd, tp=Object.assign({}, S.topicPos), tasks=[];
+  let n=blocksFor(M);
+  if(st.mode==="recuperacao") n=Math.max(1,n-1);
+  if(wd===0) n=1; else if(wd===6 && M<=120) n=Math.max(1,n-1);
+  const T=(key,type,label,min,href)=>tasks.push({k:key,type,label,min,href,done:false});
+  if(st.mode==="revisao") T("rev","rev","Revisão de erros (repetição espaçada)",25);
   for(let i=0;i<n;i++){
     const disc = CYCLE[(S.cyclePos+i)%CYCLE.length];
     const ti = (tp[disc]||0); tp[disc] = ti+1;
     const tl = GUIDES[disc].topics, top = tl[ti % tl.length];
-    tasks.push({k:"b"+i, type:"block", disc, topic:ti % tl.length, lap: Math.floor(ti/tl.length), label:DISC[disc].s+": "+top.t, min:blockMin(S.minutes), done:false});
+    tasks.push({k:"b"+i, type:"block", disc, topic:ti % tl.length, lap: Math.floor(ti/tl.length), label:DISC[disc].s+": "+top.t, min:blockMin(M), done:false});
   }
-  tasks.push({k:"sim", type:"sim", label:"Simulado do dia: 10 questões", min:20, done:false});
-  if(S.minutes>=90) tasks.push({k:"rev", type:"rev", label:"Revisão de erros (repetição espaçada)", min:15, done:false});
-  if(S.minutes>=180) tasks.push({k:"lei", type:"lei", label:"Lei seca: leia 15 artigos da LGPD em voz alta", min:15, done:false});
-  S.days[k] = {tasks, simIds: pickSim(k), simAns:{}, simDone:false};
+  if(wd===0){ T("long","long","Simuladão cronometrado: 30 questões",45,"#simulado"); T("check","check","Check-in semanal: leia o Relatório e ajuste a semana",10,"#relatorio"); }
+  else T("sim","sim","Simulado do dia: 10 questões",20);
+  if(st.mode!=="revisao" && M>=90) T("rev","rev","Revisão de erros (repetição espaçada)",15);
+  if(st.mode==="recuperacao") T("weak","weak","Treino de pontos fracos: 10 questões",20,"#relatorio");
+  if(M>=90) T("flash","flash","Flashcards: 10 cartões",5,"#simulado");
+  if(wd===6){ if(st.ph>=1) T("essay","essay","Redação completa (40 min, sem consulta)",40,"#redacao"); else T("disc","disc","Questão discursiva curta com espelho",15,"#redacao"); }
+  else if((wd===3 && M>=90) || st.mode==="avanco") T("disc","disc","Questão discursiva curta com espelho",15,"#redacao");
+  if(M>=180 || wd===6){ const lb=nextLei(); T("lei","lei","Lei seca: "+lb.n+", "+lb.p,15,"#ciclo"); }
+  S.days[k] = {v2:1, mode:st.mode, why:st.why, tasks, simIds: ex?ex.simIds:pickSim(k), simAns:{}, simDone:false};
   save(); return S.days[k];
 }
 function toggleTask(k, key, val){
@@ -358,9 +384,10 @@ function vHoje(){
     <section class="card" style="display:grid;gap:12px">
       <div class="row" style="justify-content:space-between"><h2>Meta de hoje</h2><span class="ref">${totalMin} min</span></div>
       <div class="bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+      ${d.why?`<p class="note" style="margin:0"><b>Estratégia de hoje (modo ${esc(MODES[d.mode]||"padrão")}):</b> ${esc(d.why)}</p>`:""}
       <ul class="tasks">${d.tasks.map(t=>`
         <li class="${t.done?"done":""}"><input type="checkbox" id="t-${t.k}" data-task="${t.k}" ${t.done?"checked":""} aria-label="${esc(t.label)}">
-        <label for="t-${t.k}"><span class="tl">${esc(t.label)}</span>${t.type==="block"?`<small>${t.lap?"Revisão (volta "+(t.lap+1)+") · ":""}Leia o guia, faça resumo de 5 linhas e 5 questões do tema</small>`:t.type==="sim"?`<small>${Object.keys(d.simAns||{}).length}/10 respondidas · <a href="#simulado">abrir</a></small>`:t.type==="rev"?`<small>${due} pendentes hoje · <a href="#simulado">revisar</a></small>`:""}</label>
+        <label for="t-${t.k}"><span class="tl">${esc(t.label)}</span>${t.type==="block"?`<small>${t.lap?"Revisão (volta "+(t.lap+1)+") · ":""}Leia o guia, faça resumo de 5 linhas e 5 questões do tema</small>`:t.type==="sim"?`<small>${Object.keys(d.simAns||{}).length}/10 respondidas · <a href="#simulado">abrir</a></small>`:t.type==="rev"?`<small>${due} pendentes hoje · <a href="#simulado">revisar</a></small>`:t.href?`<small><a href="${t.href}">abrir</a></small>`:""}</label>
         <span class="mins">${t.min}′</span></li>`).join("")}</ul>
       <p class="note">O dia conta como progresso com 60% da meta. Dia ruim? Faça a versão mínima: o simulado e um bloco.</p>
     </section>
@@ -378,6 +405,8 @@ function vHoje(){
 function vSimulado(){
   const k=TODAY(), d=S.days[k], due=Object.keys(S.err).filter(i=>S.err[i].due<=k);
   if(ui.mode) return vQuiz();
+  if(ui.flash) return vFlash();
+  const LS=(S.longSims||[]).slice(-1)[0], F=S.flash||{}, fm=FLASH.filter(c=>(F[c.id]||{}).box>=3).length;
   const answered = Object.keys(d.simAns).length, hits = d.simIds.filter(id=>id in d.simAns && d.simAns[id]===qById(id).a).length;
   return `
   <section style="display:grid;gap:6px"><div class="eyebrow">Simulado diário · ${esc(fmtDate(k))}</div><h1 style="font-size:1.8rem">Desafio de hoje</h1>
@@ -394,6 +423,18 @@ function vSimulado(){
       <button data-start="rev" ${due.length?"":"disabled"}>Revisar agora</button>
     </section>
   </div>
+  <div class="grid2">
+    <section class="card" style="display:grid;gap:10px">
+      <h2>Simuladão cronometrado</h2>
+      <p class="muted" style="margin:0">30 questões em modo prova: sem gabarito até entregar, com tempo e nota líquida. Recomendado aos domingos. ${LS?`Último: ${LS.ok}/${LS.n} em ${fmtSecs(LS.secs)} (${esc(fmtDate(LS.k))}).`:""}</p>
+      <button data-start="long">Começar simuladão</button>
+    </section>
+    <section class="card" style="display:grid;gap:10px">
+      <h2>Flashcards</h2>
+      <p class="muted" style="margin:0">Prazos, números e pegadinhas em ${FLASH.length} cartões com repetição espaçada. ${fm} dominados, ${flashList().length} para hoje.</p>
+      <button data-fstart>Estudar 10 cartões</button>
+    </section>
+  </div>
   <section class="card" style="display:grid;gap:12px">
     <h2>Treino por disciplina</h2>
     <div class="disc-pick">${Object.keys(DISC).map(x=>`<button data-tdisc="${x}" aria-pressed="${ui.trainDisc===x}">${esc(DISC[x].s)} <span class="muted">${allQ().filter(q=>q.d===x).length}</span></button>`).join("")}</div>
@@ -403,23 +444,110 @@ function vSimulado(){
     <p class="note">Banco atual: ${QB.length} questões no padrão Cebraspe, FGV e IADES (a IADES aplicou a seleção da ANPD em 2025), sobre os temas mais cobrados. ${(S.aiQ||[]).length?(S.aiQ.length+" questões geradas por IA no seu banco."):""} Questões de IA podem conter erro: confira sempre a referência.</p>
   </section>`;
 }
+function fmtSecs(s){ s=Math.max(0,Math.round(s)); return pad(Math.floor(s/60))+":"+pad(s%60); }
+setInterval(()=>{ const c=document.querySelector("#clock"); if(c && ui.t0 && !ui.longDone) c.textContent=fmtSecs((Date.now()-ui.t0)/1000); },1000);
+function pickLong(){
+  const r=rng("L"+Date.now()), seen=new Set(S.log.map(e=>e.split("|")[1])), quota={lgpd:9,anpd:5}, out=[];
+  Object.keys(DISC).forEach(d=>{ const arr=allQ().filter(q=>q.d===d).sort(()=>r()-.5); arr.sort((a,b)=>(seen.has(a.id)?1:0)-(seen.has(b.id)?1:0)); arr.slice(0,quota[d]||2).forEach(q=>out.push(q.id)); });
+  return out.sort(()=>r()-.5);
+}
+function finishLong(){
+  const ids=ui.list.filter(id=>id in ui.ansMap); let ok=0, net=0;
+  ids.forEach(id=>{ const q=qById(id), hit=ui.res[id]; if(hit){ ok++; net++; } else if(q.t==="ce") net--; });
+  const secs=Math.round((Date.now()-ui.t0)/1000);
+  ui.longRes={n:ids.length,tot:ui.list.length,ok,net,secs};
+  if(ids.length>=10){ S.longSims=(S.longSims||[]).concat({k:TODAY(),n:ids.length,tot:ui.list.length,ok,net,secs}).slice(-60); markTask("long"); save(); }
+  ui.longDone=true; ui.showSum=true;
+}
+function vLongSum(){
+  const R=ui.longRes, by={}; ui.list.forEach(id=>{ if(!(id in ui.ansMap)) return; const d=qById(id).d; by[d]=by[d]||{n:0,ok:0}; by[d].n++; if(ui.res[id]) by[d].ok++; });
+  return `<section class="card" style="display:grid;gap:12px">
+    <div class="eyebrow">Simuladão concluído</div><h2>Resultado</h2>
+    <div class="stats"><div><b>${R.ok}/${R.n}</b><span>acertos</span></div><div><b>${R.n?Math.round(R.ok/R.n*100):0}%</b><span>aproveitamento</span></div><div><b>${R.net}</b><span>nota líquida</span></div><div><b>${fmtSecs(R.secs)}</b><span>tempo total</span></div></div>
+    <p class="note" style="margin:0">Nota líquida: nos itens de certo/errado, cada erro anula um acerto, como no Cebraspe. ${R.tot-R.n?(R.tot-R.n)+" questões ficaram em branco. ":""}${R.n?"Média de "+Math.round(R.secs/R.n)+" segundos por questão.":""}${R.n<10?" Responda ao menos 10 questões para o simuladão contar no medidor.":""}</p>
+    ${Object.keys(by).map(d=>`<div class="hbar"><span>${esc(DISC[d].s)}</span><span class="t"><i style="width:${by[d].ok/by[d].n*100}%"></i></span><span class="v">${by[d].ok}/${by[d].n}</span></div>`).join("")}
+    <div class="row"><button class="primary" data-longrev>Rever questões e comentários</button><button data-quit>Fechar</button></div>
+  </section>`;
+}
 function vQuiz(){
-  const id = ui.list[ui.i], q = qById(id), k=TODAY();
+  if(ui.mode==="long" && ui.showSum) return vLongSum();
+  const id = ui.list[ui.i], q = qById(id), k=TODAY(), hide = ui.mode==="long" && !ui.longDone;
   const prev = ui.mode==="sim" ? S.days[k].simAns[id] : ui.ansMap[id];
   const answered = prev!==undefined && prev!==null;
   const ok = answered && prev===q.a;
-  const nav = ui.list.map((x,j)=>{ let c=""; if(ui.mode==="sim" && x in S.days[k].simAns) c = S.days[k].simAns[x]===qById(x).a?"ok":"no"; else if(ui.res && x in ui.res) c = ui.res[x]?"ok":"no"; return `<span class="${c} ${j===ui.i?"cur":""}">${j+1}</span>`; }).join("");
-  const L="ABCDE";
+  const nav = ui.list.map((x,j)=>{ let c=""; if(hide){ if(x in ui.ansMap) c="sel"; } else if(ui.mode==="sim" && x in S.days[k].simAns) c = S.days[k].simAns[x]===qById(x).a?"ok":"no"; else if(ui.res && x in ui.res) c = ui.res[x]?"ok":"no"; return `<span class="${c} ${j===ui.i?"cur":""}">${j+1}</span>`; }).join("");
+  const L="ABCDE", cls=v=> hide ? (answered&&v===prev?"sel":"") : (answered&&v===q.a?"ok":answered&&v===prev?"no":"");
   return `<section class="card q">
-    <div class="row" style="justify-content:space-between"><div class="row"><span class="chip">${esc(DISC[q.d].s)}</span><span class="eyebrow">Estilo ${esc(q.e||"IA")}</span></div><button data-quit>Sair</button></div>
+    <div class="row" style="justify-content:space-between"><div class="row"><span class="chip">${esc(DISC[q.d].s)}</span><span class="eyebrow">Estilo ${esc(q.e||"IA")}</span>${ui.mode==="long"&&!ui.longDone?`<span class="ref" id="clock">${fmtSecs((Date.now()-ui.t0)/1000)}</span>`:""}</div><button data-quit>${hide?"Entregar prova":"Sair"}</button></div>
     <div class="qnav">${nav}</div>
     <div class="stmt">${esc(q.q)}</div>
-    ${q.t==="ce" ? `<div class="ce">${[true,false].map(v=>`<button data-ans="${v}" class="${answered&&v===q.a?"ok":answered&&v===prev?"no":""}" ${answered?"disabled":""}>${v?"Certo":"Errado"}</button>`).join("")}</div>`
-      : `<div class="opts">${q.o.map((o,j)=>`<button data-ans="${j}" class="${answered&&j===q.a?"ok":answered&&j===prev?"no":""}" ${answered?"disabled":""}><b>${L[j]}</b><span>${esc(o)}</span></button>`).join("")}</div>`}
-    ${answered?`<div class="feedback ${ok?"":"no"}"><b>${ok?"Acertou.":"Errou."}</b> ${q.t==="ce"?"Gabarito: "+(q.a?"Certo":"Errado")+". ":"Gabarito: "+L[q.a]+". "}${esc(q.c)} <span class="ref">${esc(q.r)}</span></div>`:""}
+    ${q.t==="ce" ? `<div class="ce">${[true,false].map(v=>`<button data-ans="${v}" class="${cls(v)}" ${answered?"disabled":""}>${v?"Certo":"Errado"}</button>`).join("")}</div>`
+      : `<div class="opts">${q.o.map((o,j)=>`<button data-ans="${j}" class="${cls(j)}" ${answered?"disabled":""}><b>${L[j]}</b><span>${esc(o)}</span></button>`).join("")}</div>`}
+    ${answered&&!hide?`<div class="feedback ${ok?"":"no"}"><b>${ok?"Acertou.":"Errou."}</b> ${q.t==="ce"?"Gabarito: "+(q.a?"Certo":"Errado")+". ":"Gabarito: "+L[q.a]+". "}${esc(q.c)} <span class="ref">${esc(q.r)}</span></div>`:""}
+    ${hide?`<p class="note" style="margin:0">Modo prova: o gabarito aparece só depois de entregar. Em dúvida real, deixe em branco.</p>`:""}
     <div class="row" style="justify-content:space-between"><button data-step="-1" ${ui.i?"":"disabled"}>Anterior</button>
-    ${ui.i<ui.list.length-1?`<button class="primary" data-step="1" ${answered||ui.mode==="sim"?"":"disabled"}>Próxima</button>`:`<button class="primary" data-quit>Concluir</button>`}</div>
+    ${ui.i<ui.list.length-1?`<button class="primary" data-step="1" ${answered||ui.mode==="sim"||ui.mode==="long"?"":"disabled"}>Próxima</button>`:`<button class="primary" data-quit>${hide?"Entregar prova":"Concluir"}</button>`}</div>
   </section>`;
+}
+
+// ======== FLASHCARDS ========
+function flashList(){ const F=S.flash||{}, t=TODAY(); return FLASH.filter(c=>F[c.id]&&F[c.id].due<=t).concat(FLASH.filter(c=>!F[c.id])).slice(0,10).map(c=>c.id); }
+function vFlash(){
+  const f=ui.flash, c=FLASH.find(x=>x.id===f.list[f.i]);
+  return `<section class="card" style="display:grid;gap:14px">
+    <div class="row" style="justify-content:space-between"><span class="eyebrow">Flashcard ${f.i+1} de ${f.list.length}</span><button data-fquit>Sair</button></div>
+    <div class="stmt" style="font-size:1.2rem;font-weight:600">${esc(c.f)}</div>
+    ${f.show?`<div class="feedback"><b>Resposta:</b> ${esc(c.b)}</div><div class="ce"><button data-frate="1" class="ok">Sabia</button><button data-frate="0" class="no">Não sabia</button></div>`
+      :`<button class="primary" data-fshow>Mostrar resposta</button><p class="note" style="margin:0">Responda de cabeça antes de virar o cartão.</p>`}
+  </section>`;
+}
+
+// ======== LEI SECA ========
+function vLei(){
+  const L=S.lei||{}, total=LEI_BLOCKS.length, read=LEI_BLOCKS.filter(b=>(L[b.id]||{}).n).length, nx=nextLei();
+  return `<section class="card" style="display:grid;gap:10px">
+    <div class="row" style="justify-content:space-between"><h2>Lei seca: controle de leitura</h2><span class="ref">${read}/${total} blocos lidos</span></div>
+    <p class="note" style="margin:0">Próxima leitura sugerida: <b>${esc(nx.n)}, ${esc(nx.p)}</b>. Leia em voz alta e marque. A meta é passar por tudo 3 vezes até a prova. Os links das normas estão na aba Guias.</p>
+    <div class="tbl"><table class="plan"><thead><tr><th>Norma</th><th>Trecho</th><th>Leituras</th><th></th></tr></thead><tbody>
+    ${LEI_BLOCKS.map(b=>{ const x=L[b.id]||{}; return `<tr><td>${esc(b.n)}</td><td>${esc(b.p)}</td><td>${x.n||0}${x.last?` <span class="muted">(${esc(fmtDate(x.last))})</span>`:""}</td><td><button data-lei="${b.id}" style="padding:4px 10px;font-size:.85rem">Li hoje</button></td></tr>`; }).join("")}
+    </tbody></table></div>
+  </section>`;
+}
+
+// ======== DISCURSIVAS CURTAS ========
+function vDrills(){
+  const i=ui.drillIdx||0, d=ESSAY_DRILLS[i], sv=(S.drills||{})[i]||{}, hits=sv.hits||[];
+  return `<section class="card" style="display:grid;gap:10px"><h2>Questões de apoio à redação</h2>
+    <p class="note" style="margin:0">Duas formas de treinar antes da redação completa: questões objetivas sobre técnica de escrita e questões discursivas curtas (5 a 10 linhas) com espelho de correção.</p>
+    <div class="row"><button class="primary" data-start="essayq">Treinar técnica de redação (${QB.filter(q=>q.id[0]==="x").length} questões)</button></div>
+    <h3 style="margin-top:6px">Discursiva curta</h3>
+    <div class="disc-pick">${ESSAY_DRILLS.map((x,j)=>`<button data-drill="${j}" aria-pressed="${j===i}">${j+1}${(S.drills||{})[j]&&S.drills[j].at?" ✓":""}</button>`).join("")}</div>
+    <div class="stmt">${esc(d.q)}</div>
+    <label for="drill" class="eyebrow">Sua resposta (5 a 10 linhas, 10 minutos)</label>
+    <textarea id="drill" rows="7" style="width:100%;font:inherit;line-height:1.6;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)">${esc(sv.text||"")}</textarea>
+    ${ui.drillShow||sv.at?`<div class="feedback"><b>Espelho de correção.</b> Marque o que sua resposta trouxe:
+      <ul class="tasks" style="margin-top:8px">${d.pts.map((p,j)=>`<li style="grid-template-columns:28px 1fr"><input type="checkbox" id="dp${j}" data-dpt="${j}" ${hits.includes(j)?"checked":""}><label for="dp${j}">${esc(p)}</label></li>`).join("")}</ul>
+      <div class="row" style="margin-top:8px;justify-content:space-between"><span class="ref">${hits.length}/${d.pts.length} pontos</span><button class="primary" id="drill-save">Salvar autoavaliação</button></div></div>`
+      :`<div class="row"><button id="drill-show">Ver espelho de correção</button></div>`}
+  </section>`;
+}
+function bindNew(v){
+  v.querySelectorAll("[data-longrev]").forEach(b=>b.onclick=()=>{ ui.showSum=false; ui.i=0; render(); });
+  v.querySelectorAll("[data-fstart]").forEach(b=>b.onclick=()=>{ const l=flashList(); if(!l.length){ toast("Nenhum cartão para hoje. Volte amanhã."); return; } ui.flash={list:l,i:0,show:false,n:0}; render(); });
+  v.querySelectorAll("[data-fshow]").forEach(b=>b.onclick=()=>{ ui.flash.show=true; render(); });
+  v.querySelectorAll("[data-fquit]").forEach(b=>b.onclick=()=>{ ui.flash=null; render(); });
+  v.querySelectorAll("[data-frate]").forEach(b=>b.onclick=()=>{
+    const f=ui.flash, id=f.list[f.i], t=TODAY(), steps=[1,3,7,21,45]; S.flash=S.flash||{}; S.flashLog=S.flashLog||{};
+    const box = b.dataset.frate==="1" ? Math.min(4,((S.flash[id]||{}).box||0)+1) : 0;
+    S.flash[id]={box,due:addDays(t,steps[box])}; S.flashLog[t]=(S.flashLog[t]||0)+1; f.i++; f.show=false; f.n++;
+    if(f.i>=f.list.length){ ui.flash=null; markTask("flash"); toast("Sessão de flashcards concluída."); }
+    save(); render();
+  });
+  v.querySelectorAll("[data-lei]").forEach(b=>b.onclick=()=>{ const id=b.dataset.lei, t=TODAY(); S.lei=S.lei||{}; const x=S.lei[id]||{n:0}; if(x.last===t){ toast("Este bloco já foi marcado hoje."); return; } S.lei[id]={n:x.n+1,last:t}; S.leiLog=(S.leiLog||[]).concat(t).slice(-400); markTask("lei"); save(); render(); toast("Leitura registrada."); });
+  v.querySelectorAll("[data-drill]").forEach(b=>b.onclick=()=>{ ui.drillIdx=+b.dataset.drill; ui.drillShow=false; render(); });
+  const ds=$("#drill-show"); if(ds) ds.onclick=()=>{ const ta=$("#drill"); if(ta.value.trim().split(/\s+/).length<25){ toast("Escreva pelo menos 25 palavras antes de ver o espelho."); return; } const i=ui.drillIdx||0; S.drills=S.drills||{}; S.drills[i]=Object.assign({},S.drills[i],{text:ta.value}); ui.drillShow=true; save(); render(); };
+  const sv=$("#drill-save"); if(sv) sv.onclick=()=>{ const i=ui.drillIdx||0, t=TODAY(), ta=$("#drill"); S.drills=S.drills||{}; const hits=[...v.querySelectorAll("[data-dpt]")].filter(c=>c.checked).map(c=>+c.dataset.dpt); const first=!(S.drills[i]&&S.drills[i].at===t);
+    S.drills[i]={text:ta.value,hits,at:t}; if(first){ S.drillLog=(S.drillLog||[]).concat(t).slice(-400); markTask("disc"); } save(); render(); toast("Autoavaliação salva: "+hits.length+"/"+ESSAY_DRILLS[i].pts.length+" pontos."); };
 }
 
 function vCiclo(){
@@ -438,7 +566,8 @@ function vCiclo(){
   <section class="card"><h2>Pesos do ciclo</h2>
     ${Object.keys(DISC).map(d=>{ const n=CYCLE.filter(x=>x===d).length, tp=S.topicPos[d]||0, tl=GUIDES[d].topics.length; return `<div class="hbar"><span>${esc(DISC[d].s)}</span><span class="t" title="${tp} de ${tl} tópicos"><i style="width:${Math.min(100,tp/tl*100)}%"></i></span><span class="v">${n}× · ${Math.min(tp,tl)}/${tl}</span></div>`;}).join("")}
     <p class="note">Barra: tópicos do guia já estudados. Número à direita: quantas vezes a disciplina aparece em cada volta do ciclo.</p>
-  </section>`;
+  </section>
+  ${vLei()}`;
 }
 
 function vGuias(){
@@ -500,7 +629,28 @@ function vPlano(){
   return `
   <section style="display:grid;gap:6px"><div class="eyebrow">Planejamento · concurso ANPD</div><h1 style="font-size:1.8rem">Plano para manter todos os dias</h1>
   <p class="muted" style="margin:0;max-width:68ch">Plano pré-edital. O edital ainda não saiu e a banca não foi definida (novembro de 2026). Estudamos o que é certo de cair (LGPD e ANPD) e a base comum das agências reguladoras. Quando o edital sair, os guias serão ajustados.</p></section>
-  <section class="card" style="display:grid;gap:12px"><h2>Rotina diária (${m} min)</h2>
+  <section class="card" style="display:grid;gap:12px"><h2>Novo plano: 7 formas de evoluir</h2>
+    <p class="note" style="margin:0">Só ler e fazer questões faz o desempenho estacionar. O plano agora alterna sete tipos de treino, cada um para uma habilidade da prova.</p>
+    <div class="tbl"><table class="plan"><thead><tr><th>Forma</th><th>Para quê</th><th>Quando</th><th>Onde no app</th></tr></thead><tbody>
+      <tr><td>1. Ciclo de teoria</td><td>Cobrir o conteúdo</td><td>Todo dia</td><td>Hoje, Guias</td></tr>
+      <tr><td>2. Simulado diário</td><td>Fixar e medir</td><td>Segunda a sábado</td><td>Simulado</td></tr>
+      <tr><td>3. Revisão de erros</td><td>Não repetir o erro</td><td>Todo dia (1, 3, 7 e 21 dias)</td><td>Simulado</td></tr>
+      <tr><td>4. Flashcards</td><td>Prazos, números, pegadinhas</td><td>Todo dia, 5 minutos</td><td>Simulado</td></tr>
+      <tr><td>5. Lei seca</td><td>Letra da lei</td><td>Sábado (ou todo dia com 3h+)</td><td>Ciclo</td></tr>
+      <tr><td>6. Parte escrita</td><td>Discursiva</td><td>Quarta: discursiva curta. Sábado: redação (Fase 2+)</td><td>Redação</td></tr>
+      <tr><td>7. Simuladão cronometrado</td><td>Tempo, resistência, nota líquida</td><td>Domingo</td><td>Simulado</td></tr>
+    </tbody></table></div>
+  </section>
+  <section class="card" style="display:grid;gap:12px"><h2>Estratégia diária adaptativa</h2>
+    <p class="note" style="margin:0">A meta do dia é montada de manhã conforme o seu desempenho. O modo do dia aparece na aba Hoje.</p>
+    <div class="tbl"><table class="plan"><thead><tr><th>Modo</th><th>Quando entra</th><th>O que muda</th></tr></thead><tbody>
+      <tr><td>Padrão</td><td>Desempenho dentro do esperado</td><td>Blocos do ciclo, simulado, revisão e flashcards.</td></tr>
+      <tr><td>Recuperação</td><td>Acerto abaixo de 60% nos últimos 7 dias (mín. 20 questões)</td><td>Um bloco de teoria a menos e um treino de pontos fracos.</td></tr>
+      <tr><td>Revisão</td><td>15 ou mais erros aguardando revisão</td><td>A revisão vem primeiro e dura 25 minutos.</td></tr>
+      <tr><td>Avanço</td><td>Acerto de 80% ou mais (mín. 30 questões)</td><td>Entra uma questão discursiva curta.</td></tr>
+    </tbody></table></div>
+  </section>
+  <section class="card" style="display:grid;gap:12px"><h2>Rotina diária base (${m} min)</h2>
     <div class="tbl"><table class="plan"><thead><tr><th>Etapa</th><th>Tempo</th><th>O que fazer</th></tr></thead><tbody>
       ${Array.from({length:n},(_,i)=>`<tr><td>Bloco ${i+1} do ciclo</td><td>${bm} min</td><td>Ler o tópico no guia, resumir em 5 linhas com as palavras-chave e marcar artigos na lei seca.</td></tr>`).join("")}
       <tr><td>Simulado do dia</td><td>20 min</td><td>10 questões, sem consulta. Ler todos os comentários, inclusive dos acertos.</td></tr>
@@ -511,9 +661,10 @@ function vPlano(){
   </section>
   <section class="card" style="display:grid;gap:12px"><h2>Semana-modelo</h2>
     <div class="tbl"><table class="plan"><thead><tr><th>Dia</th><th>Foco</th></tr></thead><tbody>
-      <tr><td>Segunda a sexta</td><td>Rotina diária completa, seguindo o ciclo.</td></tr>
-      <tr><td>Sábado</td><td>Rotina + 1 bloco extra do ciclo. Na Fase 2 em diante: uma redação (30 linhas) sobre tema de proteção de dados.</td></tr>
-      <tr><td>Domingo</td><td>Check-in semanal (20 min): olhe a aba Progresso e os alertas. Refaça todos os erros da semana. Leve: sem teoria nova.</td></tr>
+      <tr><td>Segunda, terça, quinta e sexta</td><td>Blocos do ciclo, simulado do dia, revisão de erros e 10 flashcards.</td></tr>
+      <tr><td>Quarta</td><td>Rotina normal + 1 questão discursiva curta com espelho.</td></tr>
+      <tr><td>Sábado</td><td>Parte escrita (discursiva curta na Fase 1; redação completa da Fase 2 em diante) + um bloco de lei seca.</td></tr>
+      <tr><td>Domingo</td><td>Um bloco do ciclo, simuladão cronometrado de 30 questões e check-in semanal no Relatório.</td></tr>
     </tbody></table></div>
   </section>
   <section class="card" style="display:grid;gap:12px"><h2>Regras para não desistir</h2>
@@ -746,7 +897,9 @@ function weekStats(ws){
   const we=addDays(ws,6), a=acc(ws,we); let days=0, essays=0;
   for(let i=0;i<7;i++){ const k=addDays(ws,i); if(dayCounts(k)) days++; }
   (S.essayLog||[]).forEach(k=>{ if(k>=ws && k<=we) essays++; });
-  return {ws,we,n:a.n,ok:a.ok,p:a.p,days,essays};
+  const inW=k=>k>=ws&&k<=we, cnt=arr=>(arr||[]).filter(inW).length;
+  let flash=0; Object.keys(S.flashLog||{}).forEach(k=>{ if(inW(k)) flash+=S.flashLog[k]; });
+  return {ws,we,n:a.n,ok:a.ok,p:a.p,days,essays,flash,drills:cnt(S.drillLog),lei:cnt(S.leiLog),long:(S.longSims||[]).filter(x=>inW(x.k)).length};
 }
 function readiness(){
   const t=TODAY(), R=reportData();
@@ -777,7 +930,12 @@ function milestones(){
     ["Todos os tópicos de LGPD dominados", lgDone===lgTopics],
     ["LGPD com 75% de acerto (mín. 30 questões)", lg.n>=30 && lg.ok/lg.n>=0.75],
     ["Primeira redação concluída", (S.essayLog||[]).length>=1],
-    ["Acerto geral de 70% (mín. 200 questões)", R.total.n>=200 && R.total.p>=0.7]
+    ["Acerto geral de 70% (mín. 200 questões)", R.total.n>=200 && R.total.p>=0.7],
+    ["Primeiro simuladão cronometrado", (S.longSims||[]).length>=1],
+    ["Simuladão com 75% de aproveitamento", (S.longSims||[]).some(x=>x.n>=25 && x.ok/x.n>=0.75)],
+    ["30 flashcards dominados", FLASH.filter(c=>((S.flash||{})[c.id]||{}).box>=3).length>=30],
+    ["LGPD inteira lida 3 vezes", LEI_BLOCKS.filter(b=>b.n==="LGPD").every(b=>((S.lei||{})[b.id]||{}).n>=3)],
+    ["5 discursivas curtas com 3+ pontos", Object.values(S.drills||{}).filter(x=>x.at&&(x.hits||[]).length>=3).length>=5]
   ];
 }
 function vMedidor(){
@@ -801,6 +959,12 @@ function vMedidor(){
     ${G.essays?`<div class="row">Redações${bar(cur.essays,G.essays,cur.essays+"/"+G.essays)}</div>`:""}
     <p class="note" style="margin:0">As metas sobem a cada fase. Semana de segunda a domingo.</p>
   </section>
+  <section class="card" style="display:grid;gap:10px"><h2>Formas de evolução nesta semana</h2>
+    <div class="tbl"><table class="plan"><thead><tr><th>Forma de treino</th><th>O que desenvolve</th><th>Feito</th><th>Alvo</th></tr></thead><tbody>
+    ${[["Questões objetivas","Acerto e velocidade",cur.n,G.q],["Flashcards","Memória de prazos e números",cur.flash,50],["Lei seca (blocos)","Literalidade da norma",cur.lei,3],["Discursivas curtas","Organizar a resposta",cur.drills,1],["Redação completa","Texto de prova",cur.essays,G.essays],["Simuladão cronometrado","Resistência e gestão do tempo",cur.long,1]].map(r=>`<tr><td>${r[0]}</td><td class="muted">${r[1]}</td><td><b style="color:${r[3]&&r[2]>=r[3]?"var(--good)":"var(--ink)"}">${r[2]}</b></td><td>${r[3]||"–"}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="note" style="margin:0">Uma semana equilibrada toca em todas as linhas. Se uma ficar zerada por duas semanas, ela vira a prioridade.</p>
+  </section>
   <section class="card" style="display:grid;gap:10px"><h2>Histórico semanal</h2>
     <div class="tbl"><table class="plan"><thead><tr><th>Semana</th><th>Questões</th><th>Acerto</th><th>Dias com meta</th><th>Redações</th></tr></thead><tbody>
     ${hist.filter(w=>w.we>=S.start).map(w=>`<tr><td>${esc(fmtDate(w.ws))}</td><td>${w.n}</td><td>${w.p==null?"–":Math.round(w.p*100)+"%"}</td><td>${w.days}/7</td><td>${w.essays}</td></tr>`).join("")}
@@ -816,6 +980,7 @@ function vMedidor(){
 
 // ======== REDAÇÃO ========
 function vRedacao(){
+  if(ui.mode) return vQuiz();
   const E=ESSAY_GUIDE, i=ui.essayIdx||0, tm=E.temas[i], draft=(S.essays||{})[i]||{}, txt=draft.text||"";
   const words=txt.trim()?txt.trim().split(/\s+/).length:0, lines=Math.ceil(txt.length/70);
   const cats=[...new Set(E.repertorio.map(r=>r[0]))];
@@ -839,6 +1004,7 @@ function vRedacao(){
       <div class="row"><button id="e-done">${draft.done?"Concluída ✓":"Marcar como concluída"}</button>${sample?`<button class="primary" id="e-ai" ${ui.essayBusy?"disabled":""}>${ui.essayBusy?"Corrigindo…":"Corrigir com IA"}</button>`:""}</div></div>
     ${draft.fb?`<div class="feedback"><b>Correção (IA, orientativa):</b><div style="white-space:pre-wrap;margin-top:6px">${esc(draft.fb)}</div></div>`:""}
   </section>
+  ${vDrills()}
   <section class="card" style="display:grid;gap:10px"><h2>Banco de repertório</h2>
     ${cats.map(c=>`<div><div class="eyebrow" style="margin-bottom:4px">${esc(c)}</div><ul style="margin:0;padding-left:18px;display:grid;gap:4px;max-width:72ch">${E.repertorio.filter(r=>r[0]===c).map(r=>`<li>${esc(r[1])}</li>`).join("")}</ul></div>`).join("")}
     <p class="note" style="margin:0">Use repertório como apoio ao argumento, sem decorar números que você não tem certeza.</p>
@@ -874,7 +1040,9 @@ function bind(r){
   v.querySelectorAll("[data-guide]").forEach(c=>c.addEventListener("change",()=>{ S.guide[c.dataset.guide]=c.checked; save(); render(); }));
   v.querySelectorAll("[data-tdisc]").forEach(b=>b.onclick=()=>{ ui.trainDisc=b.dataset.tdisc; render(); });
   v.querySelectorAll("[data-start]").forEach(b=>b.onclick=()=>{
-    const m=b.dataset.start, k=TODAY(); ui.mode=m; ui.i=0; ui.ansMap={}; ui.res={};
+    const m=b.dataset.start, k=TODAY(); ui.mode=m; ui.i=0; ui.ansMap={}; ui.res={}; ui.longDone=false; ui.showSum=false;
+    if(m==="long"){ ui.list=pickLong(); ui.t0=Date.now(); }
+    if(m==="essayq"){ const r=rng("x"+Date.now()); ui.list=QB.filter(q=>q.id[0]==="x").map(q=>q.id).sort(()=>r()-.5); }
     if(m==="sim"){ ui.list=S.days[k].simIds; const f=ui.list.findIndex(id=>!(id in S.days[k].simAns)); ui.i=f<0?0:f; }
     if(m==="rev") ui.list=Object.keys(S.err).filter(i=>S.err[i].due<=k && qById(i)).slice(0,20);
     if(m==="weak"){ ui.list=weakList(); if(!ui.list.length){ ui.mode=null; toast("Responda mais questões para montar o treino."); return; } }
@@ -886,10 +1054,14 @@ function bind(r){
     if(ui.mode!=="sim" && id in ui.ansMap) return; const ok=answer(ui.mode,id,ch); ui.ansMap[id]=ch; ui.res[id]=ok; render();
   });
   v.querySelectorAll("[data-step]").forEach(b=>b.onclick=()=>{ ui.i+=+b.dataset.step; render(); });
-  v.querySelectorAll("[data-quit]").forEach(b=>b.onclick=()=>{ const m=ui.mode; ui.mode=null; render(); if(m==="sim" && S.days[TODAY()].simDone) toast("Simulado concluído e registrado."); });
+  v.querySelectorAll("[data-quit]").forEach(b=>b.onclick=()=>{ const m=ui.mode;
+    if(m==="long" && !ui.longDone){ finishLong(); render(); window.scrollTo(0,0); return; }
+    if(m==="weak" && Object.keys(ui.ansMap).length>=5){ markTask("weak"); save(); }
+    ui.longDone=false; ui.showSum=false; ui.mode=null; render(); if(m==="sim" && S.days[TODAY()].simDone) toast("Simulado concluído e registrado."); });
   v.querySelectorAll("[data-reset]").forEach(b=>b.onclick=()=>{ const a=b.dataset.reset; if(a==="ask") ui.confirmReset=true; else if(a==="no") ui.confirmReset=false; else { ui.confirmReset=false; S=blank(); ensureDay(); save(); toast("Progresso apagado."); } render(); });
   const ai=$("#ai-gen"); if(ai) ai.onclick=genAI;
   bindExtra(v);
+  bindNew(v);
   if(r==="redacao") bindRedacao(v);
 }
 

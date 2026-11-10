@@ -7,8 +7,8 @@ const { chromium } = require('playwright');
 const root = path.join(__dirname, '..');
 const ctx = {};
 new Function('ctx', fs.readFileSync(path.join(root, 'src/data.js'), 'utf8') +
-  ';ctx.DISC=DISC;ctx.CYCLE=CYCLE;ctx.GUIDES=GUIDES;ctx.QB=QB;ctx.UPDATES=UPDATES;ctx.ESSAYS=ESSAYS;ctx.ESSAY_GUIDE=ESSAY_GUIDE;ctx.PHASE_GOALS=PHASE_GOALS;')(ctx);
-const { DISC, CYCLE, GUIDES, QB, UPDATES, ESSAYS, ESSAY_GUIDE, PHASE_GOALS } = ctx;
+  ';ctx.DISC=DISC;ctx.CYCLE=CYCLE;ctx.GUIDES=GUIDES;ctx.QB=QB;ctx.UPDATES=UPDATES;ctx.ESSAYS=ESSAYS;ctx.ESSAY_GUIDE=ESSAY_GUIDE;ctx.PHASE_GOALS=PHASE_GOALS;ctx.ESSAY_DRILLS=ESSAY_DRILLS;ctx.FLASH=FLASH;ctx.LEI_BLOCKS=LEI_BLOCKS;')(ctx);
+const { DISC, CYCLE, GUIDES, QB, UPDATES, ESSAYS, ESSAY_GUIDE, PHASE_GOALS, ESSAY_DRILLS, FLASH, LEI_BLOCKS } = ctx;
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const L = 'ABCDE';
@@ -171,6 +171,8 @@ ${EG.temas.map((t, k) => `<div class="topic essay"><h3>Tema ${k + 1}. ${esc(t.t)
 <p><b class="sans">Argumentos:</b></p><ul>${t.args.map(a => `<li>${esc(a)}</li>`).join('')}</ul>
 <p><b class="sans">Proposta de conclusão:</b> ${esc(t.proposta)}</p>
 <p class="note">Feito em: ____/____/______ · Nota de conteúdo: ____ · Nota de expressão: ____</p></div>`).join('')}
+<h2>Questões discursivas curtas com espelho</h2><p class="note">Responda em 5 a 10 linhas, em 10 minutos, antes de ler o espelho. Marque os pontos que sua resposta trouxe.</p>
+${ESSAY_DRILLS.map((d, k) => `<div class="topic essay"><h3>${k + 1}. ${esc(d.q)}</h3><p class="note">Espelho:</p><ul>${d.pts.map(x => `<li><span class="check"></span>${esc(x)}</li>`).join('')}</ul></div>`).join('')}
 <h2>Folha de rascunho</h2><div class="lines">${Array.from({ length: 30 }, (_, k) => `<div><span>${k + 1}</span></div>`).join('')}</div>
 </section>`;
 
@@ -192,6 +194,25 @@ ${PHASE_GOALS.map((g, k) => `<tr><td>${fases[k]}</td><td>${g.q}</td><td>${g.days
 <h2>Planilha semanal (12 semanas)</h2>
 <table class="sheet"><tr><th>Sem.</th><th>Início</th><th>Questões</th><th>Acerto</th><th>Dias com meta</th><th>Redações</th><th>Tópicos dominados</th><th>Índice</th><th>Disciplina mais fraca</th></tr>
 ${Array.from({ length: 12 }, (_, k) => `<tr><td class="mono">${k + 1}</td>${'<td></td>'.repeat(8)}</tr>`).join('')}</table>
+<h2>Sete formas de evoluir (ritmo semanal)</h2>
+<table><tr><th>Forma</th><th>Para quê</th><th>Quando</th><th>Alvo semanal</th></tr>
+<tr><td>Ciclo de teoria</td><td>Cobrir o conteúdo</td><td>Todo dia</td><td>10–15 sessões</td></tr>
+<tr><td>Simulado diário</td><td>Fixar e medir</td><td>Segunda a sábado</td><td>6</td></tr>
+<tr><td>Revisão de erros</td><td>Não repetir o erro</td><td>Todo dia</td><td>zerar pendências</td></tr>
+<tr><td>Flashcards</td><td>Prazos, números, pegadinhas</td><td>Todo dia, 5 min</td><td>50 cartões</td></tr>
+<tr><td>Lei seca</td><td>Letra da lei</td><td>Sábado</td><td>3 blocos</td></tr>
+<tr><td>Parte escrita</td><td>Discursiva</td><td>Quarta (curta) e sábado (redação)</td><td>1 curta + redação na Fase 2+</td></tr>
+<tr><td>Simuladão cronometrado</td><td>Tempo e nota líquida</td><td>Domingo</td><td>1 de 30 questões</td></tr></table>
+<h2>Estratégia diária adaptativa</h2>
+<table><tr><th>Modo</th><th>Quando</th><th>O que muda no dia</th></tr>
+<tr><td>Padrão</td><td>Desempenho esperado</td><td>Blocos do ciclo, simulado, revisão e flashcards</td></tr>
+<tr><td>Recuperação</td><td>Acerto abaixo de 60% em 7 dias</td><td>Um bloco a menos e treino de pontos fracos</td></tr>
+<tr><td>Revisão</td><td>15+ erros pendentes</td><td>Revisão primeiro, 25 minutos</td></tr>
+<tr><td>Avanço</td><td>Acerto de 80% ou mais</td><td>Entra uma discursiva curta</td></tr></table>
+<h2>Controle de lei seca (meta: 3 leituras)</h2>
+<table><tr><th>Norma</th><th>Trecho</th><th>1ª</th><th>2ª</th><th>3ª</th></tr>${LEI_BLOCKS.map(b => `<tr><td>${esc(b.n)}</td><td>${esc(b.p)}</td>${'<td><span class="check"></span></td>'.repeat(3)}</tr>`).join('')}</table>
+<h2>Flashcards: prazos, números e pegadinhas</h2>
+<table><tr><th>Pergunta</th><th>Resposta</th></tr>${FLASH.map(c => `<tr><td>${esc(c.f)}</td><td>${esc(c.b)}</td></tr>`).join('')}</table>
 <h2>Regras de ajuste</h2><ul>
 <li>Acerto abaixo de 60% por 2 semanas: reduza teoria nova e dobre a revisão de erros.</li>
 <li>Menos de 4 dias com meta: reduza o tempo diário para algo que você cumpra todo dia.</li>
